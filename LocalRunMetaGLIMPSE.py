@@ -17,15 +17,17 @@
 ###run through notebook interface###
 outer = True
 haploid = False
-mixed_states = False
+mixed_states = True
 if haploid and mixed_states: #sanity check override user 
     raise ValueError("Cannot have mixed states for haploid data")
 
 
-GL ="/net/fantasia/home/kiranhk/Samoans/gl/bcftoolsgenogvcfs2x.vcf.gz"
+#GL = "/net/fantasia/home/kiranhk/1kg30xEUR/gl/"
+
+GL = "/net/fantasia/home/kiranhk/Samoans/gl/bcftoolsgenogvcfs2x.vcf.gz"
 
 DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/Samoan_samoanpanel_2xchr20.vcf.gz", 
-           "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/Samoan_topmednosamoans_2xchr20.vcf.gz"]
+          "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/Samoan_topmednosamoans_2xchr20.vcf.gz"]
 K = len(DS_list)
 print("mixed states are...", mixed_states, "... with", K, "reference panels", "outer join is..", outer)
 
@@ -41,7 +43,7 @@ if haploid:
     from MetaMinimac import emission_prob, transition_prob, calcNumFlips, calcMetaDosages
 else: 
     from TEProb import transition_prob, emission_prob
-    from calcMetaDosages import calcMetaDosages
+    from calcMetaDosages import calcMetaDosages, calcViterbiDosage
 if haploid: 
     from calcDistMat import extract_int, calcLambda
 else: 
@@ -52,6 +54,11 @@ Hidden = generate_hidden(K, mixed_states, haploid)
 def sample_map(sampleID):
     return(dicto[sampleID] - 1) #index starts at 0
 from BaumWelch import update_c
+from NelderMead import objective, evaluate
+from Viterbi import viterbi
+EM=False
+Nelder=False
+Viterbi=True
 
 # %%
 print("Checking vcfs...")
@@ -68,10 +75,10 @@ regions = np.load("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy")
 #start timing
 start = time.time()
 n_iter = 10
-start_c = 0.01
+start_c = 0
 for num, r in enumerate(regions):
     #print(num,r)
-    SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True) 
+    SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "flat") 
     assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
     assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
     assert len(dicto) == gl.shape[1] #check sample names are equivalent
@@ -83,7 +90,7 @@ for num, r in enumerate(regions):
     total_distance = np.sum(diffs)
     
     lda = calcNumFlips(lmbda, len(Hidden)) #initial lda for all samples
-    for sample in dicto.keys(): 
+    for sample in dicto.keys(): #['NWD100595']:: 
         mdosages = []
         #weightsc = []
         print("Meta Imputing sample ...", sample, "in region", r)
@@ -92,20 +99,25 @@ for num, r in enumerate(regions):
 
     #calculate posteriors
         # #%timeit 
-        lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
+        if EM:
+            lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
         
+        elif Nelder:  
+            evaluate(Hidden, og_transformed.size, list(og_transformed), emission_prob, transition_prob, sample_map(sample), ad, SNPs)
         
-        pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda_c)
-        mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
-        #weightsc.append(pst)
+        elif Viterbi: 
+            opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
+            #print(opt_path)
+            #print(mdosages)
+        else: #plain fwd-bwd as in paper 1
+        #use jumpfix forward backward function--scaling only required for baum welch.
+            pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
     #add to samples
         samples[sample] = list(chain.from_iterable(mdosages))
-    #weights[sample] = list(chain.from_iterable(weightsc))
-   
-    #write vcf
-    #pickle.dump(weights, open('results/test' + "weights" + str(num) + '.p', 'wb'))
-    
-    #write_vcf(samples, SNPs, 'results/chunks/samoan_baumwelch' + str(num))
-
+        
+    #write_vcf(samples, SNPs, 'results/chunks/samoan_viterbi_zerodosage' + str(num))
+    #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()
 print("total time is", end - start)

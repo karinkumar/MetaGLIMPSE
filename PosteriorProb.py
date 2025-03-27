@@ -14,8 +14,9 @@
 # ---
 
 # %%
-from ForwardProb import forward_prob
-from BackwardProb import backward_prob
+from ForwardProb import forward_prob, forward_prob_scaling
+from BackwardProb import backward_prob, backward_prob_scaling
+import numpy as np
 
 
 # %%
@@ -35,6 +36,23 @@ def fwd_bwd(Hidden, T, obs, a, b, sampleID, df, dist):
         c = sum(unnorm[i].values())
         #print(c)
         posterior.append({st: fwd[i][st] * bwd[i][st]/c for s,st in enumerate(Hidden)})
+    return(posterior)
+
+
+# %%
+def fwd_bwd_scaling(Hidden, T, obs, a, b, sampleID, df, dist): 
+    fwd, c = forward_prob_scaling(Hidden,T, obs, b, a, sampleID, df, dist)
+    
+    bwd = backward_prob_scaling(Hidden,T, obs, a, b, sampleID, df, dist, c)
+    posterior = []
+    unnorm = []
+    for i in range(len(fwd)): #fwd and bwd have the same T 
+        #create a dictionary for all the states for each time
+        #unnormalized values
+        unnorm.append({st: fwd[i][st] * bwd[i][st] for s, st in enumerate(Hidden)}) #need to divide by total probability
+        #noramlize
+        c_norm = sum(unnorm[i].values())
+        posterior.append({st: fwd[i][st] * bwd[i][st]/c_norm for s,st in enumerate(Hidden)})
     return(posterior)
 
 # %% [raw]

@@ -201,7 +201,17 @@ def get_region_list(*DS_paths, chunk_size):
 
 
 # %%
-def read_vcfs_genK_region(GL_path, *DS_paths, region, outer = True): 
+def read_vcfs_genK_region(GL_path, *DS_paths, region, outer = True, missing_handling = "flat"): 
+    '''
+    @GL_path is the path for the genotype likelihoods
+    @DS_paths are an unspecified number of paths for the dosages of each of the K panels 
+    @region is the chromosomal region
+    @outer means the union set of variants from the panels
+    @missing handling handles variants that are not in all reference panels: 
+        flat = emission probability is 1 regardless of hidden/observed state/data, 
+        zero = setting missing variants to zero
+        same = setting missing values to the same dosage as the non-missing value(only works for 2 panels)
+    '''
     #get PL --> unphred ---> pandas df #get DS ---> create allelic dosage structure numpy
     ## K reference panel
     
@@ -268,8 +278,32 @@ def read_vcfs_genK_region(GL_path, *DS_paths, region, outer = True):
 
 #all dosage str --> tuple 
     if ploidy==2: #for 0 dosage case only applies in outer merge case but still need to convert to tuple
-        all_dosage = all_dosage.applymap(lambda x: (0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
-    
+        if missing_handling == "flat":
+            all_dosage = all_dosage.applymap(lambda x: (np.nan, np.nan) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+            print("flat emission probability for missing variants")
+        elif missing_handling == "zero": 
+            all_dosage = all_dosage.applymap(lambda x: (0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+            print("missing dosages are set equal to 0")
+        elif missing_handling == "same" and len(DS_paths) == 2: #only for 2 reference panels
+            print("missing dosages are set equal to the dosage in the other reference panel")
+        
+            for col in all_dosage.columns:
+                if col.endswith('_x'):
+                    paired_col = col.replace('_x', '_y')
+        
+                    if paired_col in all_dosage.columns: #sanity check
+                        mask = all_dosage[col].apply(lambda x: pd.isna(x)) #find missing values
+                        all_dosage.loc[mask, col] = all_dosage.loc[mask, paired_col] #replace missing values
+                elif col.endswith('_y'):
+                    paired_col = col.replace('_y', '_x')
+        
+                    if paired_col in all_dosage.columns:
+                        mask = all_dosage[col].apply(lambda x: pd.isna(x))
+                        all_dosage.loc[mask, col] = all_dosage.loc[mask, paired_col]
+    #if its not in both reference panels, it shouldn't be here!
+            if all_dosage.isnull().values.any(): 
+                raise ValueError("Some marker is not in both reference panels")
+            all_dosage = all_dosage.applymap(lambda x: tuple(json.loads("[" + x + "]")))
     
 #GL tuple, unphred
     if ploidy == 1: 
@@ -316,122 +350,121 @@ def read_vcfs_genK_region(GL_path, *DS_paths, region, outer = True):
     
     return SNPs, dicto, obsGLMerge, ad_clipped
 
-
-# %%
-def read_vcfs_genK(GL_path, *DS_paths, outer = True): 
-    #get PL --> unphred ---> pandas df #get DS ---> create allelic dosage structure numpy
-    ## K reference panel
-    
- 
- #use bcftools to extract data
-    dicto = get_sample_names(DS_paths[0])
-    gl = query_bcftools(GL_path, dicto, "PL")
-    
-    
-    #get ploidy
-    #ploidy = len(json.loads("[" + gl.iloc[1,1] + "]")) - 1 #assuming gl all have the same ploidy
-    for entry in gl.iloc[:, 1]:  # Adjust the column index if necessary
-        if not pd.isna(entry) and entry != ".":
-            try:
-            # Attempt to parse the first suitable JSON string found
-                ploidy = len(json.loads("[" + entry + "]")) - 1
-                break  # Exit the loop after finding the first valid entry
-            except Exception as e:
-            # Optional: Print error if JSON parsing fails
-                print(f"Error parsing JSON from entry '{entry}': {e}")
-              # Skip to the next entry if parsing fails
-                continue  # Skip to the next entry if parsing fails
-    print("ploidy is ...", ploidy)
-    
-
-    
-    if ploidy ==1:
-        dosage_list = [query_bcftools(DS_paths[k], dicto, "DS") for k in range(len(DS_paths))]
-    else: 
-        dosage_list = [query_bcftools(DS_paths[k], dicto, "AP") for k in range(len(DS_paths))]
-    
-    #embedded function that knows what dicto is, otherwise its undefined
-    def sample_map(sampleID):
-        return(dicto[sampleID] - 1)     
-        
-    for df in dosage_list + [gl]: 
-        df.pop("drop")
-        
-    if outer:
-        all_dosage = reduce(lambda  left,right: pd.merge(left,right,on="ID",
-                                            how='outer'), dosage_list)  
-    else:
-        all_dosage = reduce(lambda  left,right: pd.merge(left,right,on="ID",
-                                            how='inner'), dosage_list) 
-    
-    
-    pos2 = np.array([int(st.split(":")[1])for st in all_dosage.ID])
-    all_dosage["pos"] = pos2
-    all_dosage["ref"] = np.array([st.split(":")[2] for st in all_dosage.ID])
-    all_dosage["alt"] = np.array([st.split(":")[3] for st in all_dosage.ID])
-    all_dosage = all_dosage.sort_values(["pos", "ref", "alt"]) #sort values for write to vcf (#NEED to sort of ref:ALT as well)
-    all_dosage.drop(["pos", "ref", "alt"], axis = 1, inplace = True)
-    #print(all_dosage)
-#OR 
- #inner join is imputed and outer - inner is saved to a vcf file which is then (merged?) to the one generated by the output function
-#write a function for this and test it    
-    
-    
-#left merge GL 
-    all_GL = pd.merge(all_dosage["ID"], gl, how = 'left', on = "ID")
-    all_GL.index = all_GL.pop("ID") #should really be merge GL
-    all_dosage.index = all_dosage.pop("ID")
-    #print(all_GL.describe())
-
-#all dosage str --> tuple 
-    if ploidy==2: #for 0 dosage case only applies in outer merge case but still need to convert to tuple
-        all_dosage = all_dosage.applymap(lambda x: (0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
-    
-    
-#GL tuple, unphred
-    if ploidy == 1: 
-        all_GL = all_GL.applymap(lambda x: (0,0) if pd.isna(x) else tuple(json.loads("[" + x + "]")))
-    elif ploidy == 2: 
-        all_GL = all_GL.applymap(lambda x: (0,0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
-    #print("unphred finished")
-    pos = (all_GL.applymap(len)).apply(any, axis = 1)
-    assert all(pos) #check for len = 0 "truthy" means 0 is false and everything else is true
-    assert np.all(all_GL.index == all_dosage.index) #check SNPs
-    SNPs = all_dosage.index #output 1
-
-    obsGLMerge=all_GL.applymap(unphred)
-    
-    
-    print("obsGL:", len(gl), "left merged GL:", len(all_GL), "merged dosage:",len(all_dosage), "individual dosages", [len(df) for df in dosage_list])
-    if outer: 
-        assert len(all_dosage) == len(all_GL) and np.all([len(all_dosage) > len(df) for df in dosage_list])
-    else:
-        assert len(all_dosage) == len(all_GL) and np.all([len(all_dosage) < len(df) for df in dosage_list])
-
-    #create allelic dosages
-    M=all_dosage.shape[0] 
-    N = len(dicto)
-    sample_list = dicto.keys()
-    final_dosages = [all_dosage.iloc[:, N*(k-1):N*k] for k in range(1, len(dosage_list) + 1)]
-    
-    allelic_dosages = np.zeros((len(dosage_list), 2, N, M)) #could change this to be smaller for ploidy 1 
-    
-    
-
-#loop over samples
-    for k, df in enumerate(final_dosages): 
-        df.columns = list(dicto.keys())
-        for sample in sample_list:
-            if ploidy ==1: 
-                allelic_dosages[k][0][sample_map(sample)] = df[sample].apply(lambda x: x) 
-            elif ploidy == 2: 
-                allelic_dosages[k][0][sample_map(sample)] = df[sample].apply(lambda x: x[0]) #(2,1)
-                allelic_dosages[k][1][sample_map(sample)] = df[sample].apply(lambda x: x[1])#(2,2)
-
-   #clip values to prevent underflow
-    ad_clipped = np.clip(allelic_dosages, epsilon, 1 - epsilon)
-    
-    return SNPs, dicto, obsGLMerge, ad_clipped
+# %% [markdown]
+# def read_vcfs_genK(GL_path, *DS_paths, outer = True): 
+#     #get PL --> unphred ---> pandas df #get DS ---> create allelic dosage structure numpy
+#     ## K reference panel
+#     
+#  
+#  #use bcftools to extract data
+#     dicto = get_sample_names(DS_paths[0])
+#     gl = query_bcftools(GL_path, dicto, "PL")
+#     
+#     
+#     #get ploidy
+#     #ploidy = len(json.loads("[" + gl.iloc[1,1] + "]")) - 1 #assuming gl all have the same ploidy
+#     for entry in gl.iloc[:, 1]:  # Adjust the column index if necessary
+#         if not pd.isna(entry) and entry != ".":
+#             try:
+#             # Attempt to parse the first suitable JSON string found
+#                 ploidy = len(json.loads("[" + entry + "]")) - 1
+#                 break  # Exit the loop after finding the first valid entry
+#             except Exception as e:
+#             # Optional: Print error if JSON parsing fails
+#                 print(f"Error parsing JSON from entry '{entry}': {e}")
+#               # Skip to the next entry if parsing fails
+#                 continue  # Skip to the next entry if parsing fails
+#     print("ploidy is ...", ploidy)
+#     
+#
+#     
+#     if ploidy ==1:
+#         dosage_list = [query_bcftools(DS_paths[k], dicto, "DS") for k in range(len(DS_paths))]
+#     else: 
+#         dosage_list = [query_bcftools(DS_paths[k], dicto, "AP") for k in range(len(DS_paths))]
+#     
+#     #embedded function that knows what dicto is, otherwise its undefined
+#     def sample_map(sampleID):
+#         return(dicto[sampleID] - 1)     
+#         
+#     for df in dosage_list + [gl]: 
+#         df.pop("drop")
+#         
+#     if outer:
+#         all_dosage = reduce(lambda  left,right: pd.merge(left,right,on="ID",
+#                                             how='outer'), dosage_list)  
+#     else:
+#         all_dosage = reduce(lambda  left,right: pd.merge(left,right,on="ID",
+#                                             how='inner'), dosage_list) 
+#     
+#     
+#     pos2 = np.array([int(st.split(":")[1])for st in all_dosage.ID])
+#     all_dosage["pos"] = pos2
+#     all_dosage["ref"] = np.array([st.split(":")[2] for st in all_dosage.ID])
+#     all_dosage["alt"] = np.array([st.split(":")[3] for st in all_dosage.ID])
+#     all_dosage = all_dosage.sort_values(["pos", "ref", "alt"]) #sort values for write to vcf (#NEED to sort of ref:ALT as well)
+#     all_dosage.drop(["pos", "ref", "alt"], axis = 1, inplace = True)
+#     #print(all_dosage)
+# #OR 
+#  #inner join is imputed and outer - inner is saved to a vcf file which is then (merged?) to the one generated by the output function
+# #write a function for this and test it    
+#     
+#     
+# #left merge GL 
+#     all_GL = pd.merge(all_dosage["ID"], gl, how = 'left', on = "ID")
+#     all_GL.index = all_GL.pop("ID") #should really be merge GL
+#     all_dosage.index = all_dosage.pop("ID")
+#     #print(all_GL.describe())
+#
+# #all dosage str --> tuple 
+#     if ploidy==2: #for 0 dosage case only applies in outer merge case but still need to convert to tuple
+#         all_dosage = all_dosage.applymap(lambda x: (0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+#     
+#     
+# #GL tuple, unphred
+#     if ploidy == 1: 
+#         all_GL = all_GL.applymap(lambda x: (0,0) if pd.isna(x) else tuple(json.loads("[" + x + "]")))
+#     elif ploidy == 2: 
+#         all_GL = all_GL.applymap(lambda x: (0,0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+#     #print("unphred finished")
+#     pos = (all_GL.applymap(len)).apply(any, axis = 1)
+#     assert all(pos) #check for len = 0 "truthy" means 0 is false and everything else is true
+#     assert np.all(all_GL.index == all_dosage.index) #check SNPs
+#     SNPs = all_dosage.index #output 1
+#
+#     obsGLMerge=all_GL.applymap(unphred)
+#     
+#     
+#     print("obsGL:", len(gl), "left merged GL:", len(all_GL), "merged dosage:",len(all_dosage), "individual dosages", [len(df) for df in dosage_list])
+#     if outer: 
+#         assert len(all_dosage) == len(all_GL) and np.all([len(all_dosage) > len(df) for df in dosage_list])
+#     else:
+#         assert len(all_dosage) == len(all_GL) and np.all([len(all_dosage) < len(df) for df in dosage_list])
+#
+#     #create allelic dosages
+#     M=all_dosage.shape[0] 
+#     N = len(dicto)
+#     sample_list = dicto.keys()
+#     final_dosages = [all_dosage.iloc[:, N*(k-1):N*k] for k in range(1, len(dosage_list) + 1)]
+#     
+#     allelic_dosages = np.zeros((len(dosage_list), 2, N, M)) #could change this to be smaller for ploidy 1 
+#     
+#     
+#
+# #loop over samples
+#     for k, df in enumerate(final_dosages): 
+#         df.columns = list(dicto.keys())
+#         for sample in sample_list:
+#             if ploidy ==1: 
+#                 allelic_dosages[k][0][sample_map(sample)] = df[sample].apply(lambda x: x) 
+#             elif ploidy == 2: 
+#                 allelic_dosages[k][0][sample_map(sample)] = df[sample].apply(lambda x: x[0]) #(2,1)
+#                 allelic_dosages[k][1][sample_map(sample)] = df[sample].apply(lambda x: x[1])#(2,2)
+#
+#    #clip values to prevent underflow
+#     ad_clipped = np.clip(allelic_dosages, epsilon, 1 - epsilon)
+#     
+#     return SNPs, dicto, obsGLMerge, ad_clipped
 
 # %% [raw]
 # gl_path = "/net/fantasia/home/kiranhk/1kg30xEUR/gl/bcftoolsgenogvcfs4x.vcf.gz"

@@ -16,6 +16,7 @@
 # %%
 JumpThreshold = 1e-10
 JumpFix = 1e10
+import numpy as np
 
 
 # %%
@@ -56,6 +57,43 @@ def forward_prob(Hidden, T, observations, emission_prob, a, sampleID, df, dist):
         fwd.append(f_curr)
         f_prev = f_curr
     return(fwd)
+
+
+# %%
+def forward_prob_scaling(Hidden, T, observations, emission_prob, a, sampleID, df, dist):
+    '''Input: Tuple of Hidden States, T number of markers, observed data, emission matrix, a: transition matrix function
+    , sampleID, dataframe
+       Output: Table of forward probabilities, each entry in the list (a dictionary) is a point in time going forwards. 
+   So 0 is Time(Marker) 0 and M is Time (Marker) M and the scaling factor for use in the backward probability
+    '''
+    fwd = []     #T is the number of Markers, #H is a tuple of hidden states
+    
+    c = np.zeros(T) #initiate scaling factor
+    for t in range(T): ##why T for loop before S for loop??? #because must progress forward in time and calculate
+        #each marker j column and THEN progress in time because each state depends on every other state in t-1
+        #print(t)
+        f_curr = {} #dictionary
+        
+        for s, names in enumerate(Hidden):
+            b = emission_prob(names, observations[t], t, sampleID, df) 
+            if t==0:
+                sum_prev = 1 #base case flat prior
+            else: 
+                sum_prev = sum(f_prev[names_]*a(names_,names, dist,t) for s_, names_ in enumerate(Hidden))
+                
+            f_curr[names] = sum_prev*b
+            c[t] += f_curr[names]
+            
+            
+       
+        f_curr = {state: prob / c[t] for state, prob in f_curr.items()} #scale
+        fwd.append(f_curr)
+        f_prev = f_curr
+        
+
+    return(fwd, 1/c) 
+
+# %%
 
 # %% [raw]
 # #test function

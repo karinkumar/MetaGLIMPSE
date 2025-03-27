@@ -55,6 +55,41 @@ def backward_prob(Hidden, T, observations, a, b, sampleID, df, dist):
         b_prev = b_curr #update for recursion (inside t-loop)
     return(bwd)
 
+
+# %%
+def backward_prob_scaling(Hidden, T, observations, a, b, sampleID, df, dist, c):
+    '''Input: Hidden states, T number of markers, observed data, a: transition matrix function
+    , b: emission matrix function, sampleID, allelic dosages, lda, c: scaling factors from forward probability
+       Output: Table of backward probabilities 
+    '''
+   
+    
+    bwd = []
+    #reverse observations to correspond with t: 
+    for t in reversed(range(T)): 
+        b_curr = {} #save previous backward probability
+        #compute emissions probability here to save time
+        if t < T-1: #not calculate t-1 
+            #T + 1 FOOL
+            b_next_value = [b(names_, observations[t+1], t + 1, sampleID, df) for s_, names_ in enumerate(Hidden)]
+            #print("marker", t + 1, "emissions for state 1 and 2", b_next_value)
+        for s,names in enumerate(Hidden):
+            if t==T-1: 
+                sum_next = 1 #base case
+            else: 
+                #for s_, names_ in enumerate(Hidden):
+                    #print("from", names_, "to:", names, "marker", t, a(names_,names, dist,t))
+                #change this double for loop to a matrix computation in numpy
+                sum_next = sum(b_prev[names_]*a(names, names_, dist, t)*b_next_value[s_] for s_,names_ in enumerate(Hidden)) #recursion
+    
+            b_curr[names] = sum_next
+        
+        b_curr = {state: prob * c[t] for state, prob in b_curr.items()}
+        bwd.insert(0,b_curr) #add dictionary to list
+        #scale here
+        b_prev = b_curr #update for recursion (inside t-loop)
+    return(bwd)
+
 # %% [raw]
 # from TEProb import emission_prob, transition_prob
 # import pickle
