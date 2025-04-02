@@ -27,8 +27,8 @@ parser.add_argument("--nomixedstate", required = False, help = "Option for MetaG
 #parser.add_argument("--inner", required = False, dest = 'outer', action= 'store_false')
 parser.add_argument("--chunk_size", required = False, dest = 'L')
 parser.add_argument("--recomb_rate", required = False, dest = 'c_start', type = float)
-parser.add_argument("--baum_welch", required = False, dest = 'bw')
-parser.add_argument("--viterbi", required = False, dest = 'viterbi')
+parser.add_argument("--baum_welch", required = False, dest = 'bw', action = "store_true")
+parser.add_argument("--viterbi", required = False, dest = 'vbi', action = "store_true")
 parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true")
 parser.add_argument("--zerodosage", required = False, dest = 'zero', action = "store_true")
 parser.set_defaults(haploid=False)
@@ -42,12 +42,19 @@ haploid = args.haploid #False
 mixed_states = not args.nomixedstate #False
 start_c = args.c_start
 bw = args.bw
+vbi = args.vbi
 #print(start_c)
 if haploid and mixed_states: #sanity check override user 
     raise ValueError("Cannot have mixed states for haploid data")
 print("mixed states are...", mixed_states)
 
-GL = args.gl #"/net/fantasia/home/kiranhk/1kg30xEAS/genogvcfs1x.vcf.gz"
+if vbi and bw: 
+    raise ValueError("Cannot use both Baum-Welch and Viterbi algorithms. Must choose 1")
+
+if vbi: 
+    print("Viterbi algorithm in use")
+    
+GL = args.gl 
 
 DS_list = args.dosages
 K=len(DS_list)
@@ -56,7 +63,6 @@ if K < 2 or K > 6:
 
 
 # %%
-
 import pickle
 import pandas as pd
 import numpy as np
@@ -68,13 +74,14 @@ if haploid:
     from MetaMinimac import emission_prob, transition_prob, calcNumFlips, calcMetaDosages
 else: 
     from TEProb import transition_prob, emission_prob
-    from calcMetaDosages import calcMetaDosages, calcMetaDosages_nan
+    from calcMetaDosages import calcMetaDosages, calcMetaDosages_nan, calcViterbiDosage
 if haploid: 
     from calcDistMat import extract_int, calcLambda
 else: 
     from calcDistMat import extract_int, calcLambda, calcNumFlips
 from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list
 from HiddenStates import generate_hidden
+from Viterbi import viterbi
 Hidden = generate_hidden(K, mixed_states, haploid)    
 def sample_map(sampleID):
     return(dicto[sampleID] - 1) #index starts at 0
@@ -102,9 +109,6 @@ for num, r in enumerate(regions):
     assert len(dicto) == gl.shape[1] #check sample names are equivalent
 
     samples = {}
-
-
-    
     lmbda, diffs = calcLambda(SNPs, start_c)
     total_distance = np.sum(diffs)
     lda = calcNumFlips(lmbda, len(Hidden))
@@ -117,19 +121,26 @@ for num, r in enumerate(regions):
         if bw: #baum welch option
             lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
             pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda_c)
-        else:    
+        
+        elif vbi:
+            print(vbi)
+            print("viterbi used")
+            opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
+            #print("viterbi used")
+        else: #fwdbwd 
     #calculate posteriors
         # #%timeit 
             pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
     #cProfile.run('pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), adc, ldac)')
     #calculate meta dosages
         
-        if missing=="flat": 
-            mdosages.append(calcMetaDosages_nan(pst, sample_map(sample), ad))
+            if missing=="flat": 
+                mdosages.append(calcMetaDosages_nan(pst, sample_map(sample), ad))
         
-        else:
-            mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
-     
+            else:
+                mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
+                #print("should not be here for viterbi")
     #add to samples
         samples[sample] = list(chain.from_iterable(mdosages))
 
