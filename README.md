@@ -7,7 +7,7 @@ This method takes the results from two or more single panel GLIMPSE2 imputations
 
 The output of this method is a vcf file at the union set of markers in each input file with the estimated genotype dosage for each sample and marker.
 
-We have shown this method is better than the best single panel imputation in the cases where imputation with the mega panel is better than the other single panel imputations (which is most cases). See pre-print for more information: TBA
+We have shown this method is better than the best single panel imputation in the cases where imputation with the mega panel is better than the other single panel imputations (which is most cases). See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025.06.24.660721v1
 
 ***1. Installation***
 
@@ -30,7 +30,12 @@ See the example folder for African American input files derived from 1000 Genome
 
 python3.8 RunMetaGLIMPSE.py --dosages ASWbcftoolsEURdiploid_1xchr20.vcf.gz ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl bcftoolsgenogvcfs1x.vcf.gz --out ASWchr20
 
-To run GLIMPSE2 please check out the GLIMPSE tutorial https://odelaneau.github.io/GLIMPSE/ 
+**2.1 Notes for Running GLIMPSE2**
+
+To run GLIMPSE2 please check out the GLIMPSE tutorial https://odelaneau.github.io/GLIMPSE/
+And please download the ap option branch (as this provides the necessary inputs for MetaGLIMPSE) (https://github.com/odelaneau/GLIMPSE/tree/ap-field)
+Also use the following options --main 1 --burnin 19 --keep-monomorphic
+These are *essential* in obtaining the correct results in both this branch of GLIMPSE2 and in MetaGLIMPSE
 
 ***3 Ligate*** 
 
