@@ -13,9 +13,9 @@ See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025
 
 git clone https://github.com/karinkumar/MetaGLIMPSE2.git
 
-cd MetaGLIMPSE2/
+cd MetaGLIMPSE/
 
-Once you enter the MetaGLIMPSE2 folder, the executable is RunMetaGLIMPSE.py. The following options are required:
+Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The following options are required:
 
 
 -- dosages:  paths of imputed genotypes vcf files (output from GLIMPSE2), 
@@ -27,21 +27,23 @@ Once you enter the MetaGLIMPSE2 folder, the executable is RunMetaGLIMPSE.py. The
 ***2. Run Example***
 
 See the example folder for African American input files derived from 1000 Genomes and downsampled to 1x and run the following code once you have installed the program and also have access to python. 
+```
 
 python3.8 RunMetaGLIMPSE.py --dosages ASWbcftoolsEURdiploid_1xchr20.vcf.gz ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl bcftoolsgenogvcfs1x.vcf.gz --out ASWchr20
+```
 
 
 ***3 Ligate*** 
 
-MetaGLIMPSE2 produces meta-imputed chunks. In order to be turned into one vcf file for an entire chromosome, they need to be ligated used bcftools. The following code ligates the chunks in the example. 
-
+MetaGLIMPSE produces meta-imputed chunks. In order to be turned into one vcf file for an entire chromosome, they need to be ligated used bcftools. The following code ligates the chunks in the example. 
+```
 ls -v ASWchr20*.vcf.gz > list.txt
 
 bcftools concat -f list.txt -Oz -o fullASWchr20.vcf.gz
 
 bcftools index fullASWchr20.vcf.gz
 
-
+```
 **4 Running MetaGLIMPSE with your own data**
 Once you've run the example, and it works. You will need to have a genotype likelihoods file for your data that calls the UNION set of bi-allelic SNPs between the reference panels you want to meta-impute with. You will also need to remove any SNPs that are in all reference panels are bi-allelic in those reference panels, but have different minor alleles. Also make sure to remove any singletons AC=1 or variants that have AC=0 from you reference panels.
 
