@@ -75,9 +75,9 @@ def emission_prob(hidden, obs, m, sampleID, npa):
     d_a = npa[a[0] - 1][a[1] - 1][sampleID][m] #dosage for hidden ref haplotype a 
     d_b = npa[b[0] - 1][b[1] - 1][sampleID][m]  #dosage for hidden ref haplotype b
     
-    if pd.isna(d_a) or pd.isna(d_b): #might slow down the algo? #will not affect other missing data schemes
+    #if pd.isna(d_a) or pd.isna(d_b): #might slow down the algo? #will not affect other missing data schemes
         #print("nan emission")
-        return 1 #regardless of panel
+      #  return 1 #regardless of panel
         
     
     #print("d_a", d_a, "d_b", d_b, "GL0", GL0, "GL1", GL1, "GL2", GL2)

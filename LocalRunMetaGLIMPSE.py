@@ -58,14 +58,14 @@ from NelderMead import objective, evaluate
 from Viterbi import viterbi
 EM=False
 Nelder=False
-Viterbi=True
+Vbi=True
 
 # %%
 print("Checking vcfs...")
 assert check_sample_names(GL, *DS_list)
 print("Passed checks .. Chunking vcfs ...")
 L=30000
-#regions = get_region_list(*DS_list, chunk_size = L)
+regions = get_region_list(*DS_list, chunk_size = L)
 
 # %%
 #np.save("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy", regions)
@@ -73,51 +73,56 @@ regions = np.load("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy")
 
 # %%
 #start timing
-start = time.time()
 n_iter = 10
 start_c = 0
-for num, r in enumerate(regions):
-    #print(num,r)
-    SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "flat") 
-    assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
-    assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
-    assert len(dicto) == gl.shape[1] #check sample names are equivalent
+r = regions[0] #r = args.region
+chunk_num = 0 
+#for num, r in enumerate(regions):
+  
+     
+start = time.time()
+SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "same") 
+assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
+assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
+assert len(dicto) == gl.shape[1] #check sample names are equivalent
 
-    samples = {}
-    #weights = {}
-    
-    lmbda, diffs = calcLambda(SNPs, start_c)
-    total_distance = np.sum(diffs)
-    
-    lda = calcNumFlips(lmbda, len(Hidden)) #initial lda for all samples
-    for sample in dicto.keys(): #['NWD100595']:: 
-        mdosages = []
-        #weightsc = []
-        print("Meta Imputing sample ...", sample, "in region", r)
-    #subset data structures
-        og_transformed = gl[sample]
+samples = {}
+#weights = {}
 
-    #calculate posteriors
-        # #%timeit 
-        if EM:
-            lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
-        
-        elif Nelder:  
-            evaluate(Hidden, og_transformed.size, list(og_transformed), emission_prob, transition_prob, sample_map(sample), ad, SNPs)
-        
-        elif Viterbi: 
-            opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-            mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
-            #print(opt_path)
-            #print(mdosages)
-        else: #plain fwd-bwd as in paper 1
-        #use jumpfix forward backward function--scaling only required for baum welch.
-            pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-            mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
-    #add to samples
-        samples[sample] = list(chain.from_iterable(mdosages))
-        
-    #write_vcf(samples, SNPs, 'results/chunks/samoan_viterbi_zerodosage' + str(num))
-    #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
+lmbda, diffs = calcLambda(SNPs, start_c)
+total_distance = np.sum(diffs)
+
+lda = calcNumFlips(lmbda, len(Hidden)) #initial lda for all samples
+for sample in dicto.keys(): 
+    mdosages = []
+    #weightsc = []
+    print("Meta Imputing sample ...", sample, "in region", r)
+#subset data structures
+    og_transformed = gl[sample]
+
+#calculate posteriors
+    # #%timeit 
+    if EM:
+        lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
+
+    elif Nelder:  
+        evaluate(Hidden, og_transformed.size, list(og_transformed), emission_prob, transition_prob, sample_map(sample), ad, SNPs)
+
+    elif Vbi: 
+        opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+        mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
+        #print(opt_path)
+        #print(mdosages)
+    else: #plain fwd-bwd as in paper 1
+    #use jumpfix forward backward function--scaling only required for baum welch.
+        pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+        mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
+#add to samples
+    samples[sample] = list(chain.from_iterable(mdosages))
+
+write_vcf(samples, SNPs, 'results/chunks/samoan_viterbi_samedosage_test' + str(chunk_num))
+
+#print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()
 print("total time is", end - start)
+

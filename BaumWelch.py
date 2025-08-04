@@ -54,7 +54,7 @@ def update_c(Hidden, T, obs, a, b, max_iter, total_dist, sampleID, df, dist, SNP
     #denominator
         denom = np.sum(numer, axis = 1, keepdims = True)
         
-        a_hat = numer/denom
+        a_hat = numer/denom #the off-diagnols of this matrix is how to rest your transition probabilities
         
         #print(a_hat, np.sum(a_hat), np.sum(np.diag(a_hat)), T-1)
         

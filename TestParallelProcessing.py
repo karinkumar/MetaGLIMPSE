@@ -51,10 +51,10 @@ if haploid and mixed_states: #sanity check override user
     raise ValueError("Cannot have mixed states for haploid data")
 
 
-GL ="/net/fantasia/home/kiranhk/1kg30xEUR/gl/bcftoolsgenogvcfs0.5x.vcf.gz"
+GL ="/net/fantasia/home/kiranhk/1kg30xASW/gl/bcftoolsgenogvcfs1x.vcf.gz"
 
-DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/EUREURAdiploid_0.5xchr20.vcf.gz", 
-           "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/EUREURBdiploid_0.5xchr20.vcf.gz"]
+DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz", 
+           "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsEURdiploid_1xchr20.vcf.gz"]
 K = len(DS_list)
 print("mixed states are...", mixed_states, "... with", K, "reference panels", "outer join is..", outer)
 
@@ -77,6 +77,7 @@ else:
     from calcDistMat import extract_int, calcLambda, calcNumFlips
 from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list
 from HiddenStates import generate_hidden
+from BaumWelch import update_c
 Hidden = generate_hidden(K, mixed_states, haploid)    
 def sample_map(sampleID, dicto):
     return(dicto[sampleID] - 1) #index starts at 0
@@ -97,6 +98,7 @@ from itertools import chain
 import time
 start_c = 2e-7
 bw = False
+n_iter = 10
 # Assuming all functions like calcNumFlips, calcLambda, fwd_bwd, calcMetaDosages, sample_map, write_vcf, etc. are defined elsewhere
 from multiprocessing import Pool
 from itertools import chain
@@ -107,7 +109,6 @@ import time
 def process_sample(args):
     """Process an individual sample"""
     sample, dicto, gl, ad, Hidden, transition_prob, emission_prob, lda, SNPs, region, bw, total_distance, start_c = args
-    
     mdosages = []
     log_output = []
     log_output.append(f"Meta Imputing sample ... {sample} in region {region}")
@@ -159,7 +160,7 @@ def main():
     start = time.time()
 
     # Process regions **sequentially** to maintain order
-    for num, r in enumerate(regions):
+    for num, r in enumerate(reversed(regions)):
         print(f"Processing region {r} (#{num+1} out of {len(regions)})")
         
         # Read the data for the current region
@@ -188,7 +189,7 @@ def main():
         samples = parallel_process_samples(region_data, num_processes=None)  # Adjust `num_processes` as needed
 
         # Write VCF for the region
-        write_vcf(samples, SNPs, "results/chunks/parallelsamples" + str(num))
+        write_vcf(samples, SNPs, "results/chunks/parallelsamples" + str(r))
 
     end = time.time()
     print("Total time is", end - start)
@@ -252,5 +253,5 @@ if __name__ == "__main__":
 # # Here, processed_samples will be a dictionary with the same keys as `samples`
 # # but with the processed data as values.
 
-# %% [markdown]
+# %% [raw]
 # parallel_process_regions(regions, num_processes = 16)
