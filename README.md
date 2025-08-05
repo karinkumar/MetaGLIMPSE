@@ -45,11 +45,11 @@ bcftools index fullASWchr20.vcf.gz
 
 ```
 **4 Running MetaGLIMPSE with your own data**
-Once you've run the example, and it works. You will need to have a genotype likelihoods file for your data that calls the UNION set of bi-allelic SNPs between the reference panels you want to meta-impute with. You will also need to remove any SNPs that are in all reference panels are bi-allelic in those reference panels, but have different minor alleles. Also make sure to remove any singletons AC=1 or variants that have AC=0 from you reference panels.
+Once you've run the example, and it works. You will need to have a genotype likelihoods file for your data that calls the UNION set of bi-allelic SNPs between the reference panels you want to meta-impute with. Please remove any singletons (AC=1) and reference monomorphic variants (AC=0) from you reference panels. 
 
 Now you are ready to run GLIMPSE2 with each of your reference panels. Please download the ap option branch (as this provides the necessary inputs for MetaGLIMPSE) (https://github.com/odelaneau/GLIMPSE/tree/ap-field). Once you have chunked your code with GLIMPSE and binarized the reference panel, see tutorial: https://odelaneau.github.io/GLIMPSE/docs/tutorials/getting_started/ You can run a particular chunk as follows: 
 
-    LINE=$(sed -n "${{NUM}}p" YOUR_CHUNK_FILE.txt
+    LINE=$(sed -n "${{NUM}}p" YOUR_CHUNK_FILE.txt)
     #stuff
     printf -v ID "%02d" $(echo $LINE | cut -d" " -f1)
     IRG=$(echo $LINE | cut -d" " -f3)
