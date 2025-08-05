@@ -13,7 +13,7 @@ See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025
 
 git clone https://github.com/karinkumar/MetaGLIMPSE2.git
 
-cd MetaGLIMPSE/
+cd MetaGLIMPSE2/
 
 Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The following options are required:
 
@@ -29,7 +29,7 @@ Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The 
 See the example folder for African American input files derived from 1000 Genomes and downsampled to 1x and run the following code once you have installed the program and also have access to python. 
 ```
 
-python3.8 RunMetaGLIMPSE.py --dosages ASWbcftoolsEURdiploid_1xchr20.vcf.gz ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl bcftoolsgenogvcfs1x.vcf.gz --out ASWchr20
+python3.8 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --out ASWchr20
 ```
 
 
