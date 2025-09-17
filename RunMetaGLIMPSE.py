@@ -58,8 +58,8 @@ GL = args.gl
 
 DS_list = args.dosages
 K=len(DS_list)
-if K < 2 or K > 6: 
-    raise ValueError("Must have 2 reference panels to meta impute and cannot meta impute more than 6 panels")
+if K < 2:
+    raise ValueError("Must have 2 reference panels to meta impute")
 
 
 # %%
