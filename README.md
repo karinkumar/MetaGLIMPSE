@@ -13,7 +13,7 @@ See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025
 
 git clone https://github.com/karinkumar/MetaGLIMPSE2.git
 
-cd MetaGLIMPSE/
+cd MetaGLIMPSE2/
 
 Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The following options are required:
 
@@ -29,7 +29,7 @@ Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The 
 See the example folder for African American input files derived from 1000 Genomes and downsampled to 1x and run the following code once you have installed the program and also have access to python. 
 ```
 
-python3.8 RunMetaGLIMPSE.py --dosages ASWbcftoolsEURdiploid_1xchr20.vcf.gz ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl bcftoolsgenogvcfs1x.vcf.gz --out ASWchr20
+python3.8 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --zerodosage --out ASWchr20
 ```
 
 
@@ -45,11 +45,15 @@ bcftools index fullASWchr20.vcf.gz
 
 ```
 **4 Running MetaGLIMPSE with your own data**
-Once you've run the example, and it works. You will need to have a genotype likelihoods file for your data that calls the UNION set of bi-allelic SNPs between the reference panels you want to meta-impute with. You will also need to remove any SNPs that are in all reference panels are bi-allelic in those reference panels, but have different minor alleles. Also make sure to remove any singletons AC=1 or variants that have AC=0 from you reference panels.
+Once you've run the example, and it works. You will need to have a genotype likelihoods file for your data that calls the UNION set of bi-allelic SNPs between the reference panels you want to meta-impute with. Please remove any singletons (AC=1) and reference monomorphic variants (AC=0) from you reference panels. 
 
-Now you are ready to run GLIMPSE2 with each of your reference panels. Please download the ap option branch (as this provides the necessary inputs for MetaGLIMPSE) (https://github.com/odelaneau/GLIMPSE/tree/ap-field). Once you have chunked your code with GLIMPSE and binarized the reference panel, see tutorial: https://odelaneau.github.io/GLIMPSE/docs/tutorials/getting_started/ You can run a particular chunk as follows: 
+Now you are ready to run GLIMPSE2 with each of your reference panels. Please download and compile the ap option branch (as this provides the necessary inputs for MetaGLIMPSE) (https://github.com/odelaneau/GLIMPSE/tree/ap-field). This is a modified version of the standard GLIMPSE2 code, so you will need to repeat the same installation steps as for GLIMPSE2. Once you have chunked your code with GLIMPSE and binarized the reference panel, see tutorial: https://odelaneau.github.io/GLIMPSE/docs/tutorials/getting_started/ 
 
-    LINE=$(sed -n "${{NUM}}p" YOUR_CHUNK_FILE.txt
+*At the moment, we are fixing an issue with this branch, if you want to run MetaGLIMPSE and get access to AP option code, please contact me either by email or on github*
+
+You can run a particular chunk as follows: 
+
+    LINE=$(sed -n "${{NUM}}p" YOUR_CHUNK_FILE.txt)
     #stuff
     printf -v ID "%02d" $(echo $LINE | cut -d" " -f1)
     IRG=$(echo $LINE | cut -d" " -f3)
