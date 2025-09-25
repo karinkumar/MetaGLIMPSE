@@ -65,6 +65,18 @@ You can run a particular chunk as follows:
     # Execute GLIMPSE2_phase for the current chunk
     ./phase/bin/GLIMPSE2_phase --input-gl YOUR_GL_FILE.vcf.gz --reference YOUR_REF_PANEL.bin --output YOUR_OUTPUT_NAME_${{CHR}}_${{REGS}}_${\{REGE}}.bcf --out-ap-field --main 1 --burnin 19 --keep-monomorphic
 
-These last four options are *essential* in obtaining the correct results in both this branch of GLIMPSE2 and in MetaGLIMPSE
 
-Once you've run GLIMPSE2. Simply plug the imputed dosages and genotype likelihoods into MetaGLIMPSE as in Step 2. And then ligate the chunks as in Step 3. 
+These last four options are *essential* in obtaining the correct results in both this branch of GLIMPSE2 and in MetaGLIMPSE. Once you've run GLIMPSE2. Simply plug the imputed dosages and genotype likelihoods into MetaGLIMPSE as in Step 2. And then ligate the chunks as in Step 3. 
+
+
+**5 Run MetaGLIMPSE in parallel by chunk
+To run MetaGLIMPSE faster, you can do the following. First, chunk the code. 
+```
+python3.8 chunker.py --dosages [GLIMPSE2 results files here] --gl [genotype liklelihood file] --outname [output file name]
+```
+This will give you a file of the name [output file name].txt
+
+Second, run MetaGLIMPSE_chunk.py (This runs MetaGLIMPSE in a single chunk--you will need to parallelize yourself, e.g. in a bash script or snakemake). The --region command refers to the nth chunk. So if you want to impute the first chunk, --region 0 (we are in python, so the first index is 0 rather than 1).
+```
+python3.8 RunMetaGLIMPSE_chunk.py  --dosages [GLIMPSE2 results files here]   --gl [genotype likelihood file]  --out [prefix of output vcf] --zerodosage --region n --chunks [chunk file name]
+```
