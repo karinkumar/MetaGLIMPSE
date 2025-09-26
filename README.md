@@ -3,11 +3,11 @@ Meta Imputation of Low Coverage Sequencing
 
 ***Overview***
 
-This method takes the results from two or more single panel GLIMPSE2 imputations and combines the output using weights estimated via HMM for each individual and marker. 
+This method takes the results from two or more single panel GLIMPSE2 imputations and combines the output using weights estimated via HMM for each individual and marker. Note: This only supports GLIMPSE2 results as this time, not GLIMPSE1
 
 The output of this method is a vcf file at the union set of markers in each input file with the estimated genotype dosage for each sample and marker.
 
-See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025.06.24.660721v1
+See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025.06.24.660721v2
 
 ***1. Installation***
 
