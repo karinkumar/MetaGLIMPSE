@@ -46,49 +46,35 @@ def calcMetaDosages(posteriors, sample, allelic_dosages):
 
 # %%
 def calcMetaDosages_nan(posteriors, sample, allelic_dosages):
-    '''INPUT: posteriors list of dictionaries, sample number 0 - N, allelic dosages numpy array
-       OUTPUT: list of meta genotype dosages one per marker 0 to M
-       
-       NOTES:multiply across haplotypes that have the SAME posterior weight 1,1 represents reference panel 1 allele 1  
-       AND reference panel 2 allele 2 (d_a*0.01 +  d_b*0.01)
-    '''
-    meta_dosages=list()
-    for m in range(len(posteriors)):
-        #print(m)
-        panels = posteriors[m]
+    meta_dosages = []
+
+    for m, panels in enumerate(posteriors):
+        vals = []
         has_nan = False
-        meta_dosage = 0
 
-        # Check for any NaN values first
-        for key in panels:
-            a, b = key[0]
-            c, d = key[1]
-            if np.isnan(allelic_dosages[a-1][b-1][sample][m]) or np.isnan(allelic_dosages[c-1][d-1][sample][m]):
+        # First pass: gather terms and detect any NaN at all
+        for key, w in panels.items():
+            (a, b) = key[0]
+            (c, d) = key[1]
+            d1 = allelic_dosages[a-1][b-1][sample][m]
+            d2 = allelic_dosages[c-1][d-1][sample][m]
+            vals.append((d1, d2, w))
+            if np.isnan(d1) or np.isnan(d2):
                 has_nan = True
-                break
-        
-        for key, value in panels.items():
-            a, b = key[0]
-            c, d = key[1]
-            
-            # Perform calculations based on whether any NaN was found
-            if has_nan:
-                if not (np.isnan(allelic_dosages[a-1][b-1][sample][m]) or np.isnan(allelic_dosages[c-1][d-1][sample][m])):
-                    meta_dosage += (allelic_dosages[a-1][b-1][sample][m] + allelic_dosages[c-1][d-1][sample][m])
-            else:
-                meta_dosage += (allelic_dosages[a-1][b-1][sample][m] * value +
-                                allelic_dosages[c-1][d-1][sample][m] * value)
-        #print(meta_dosage)
-        meta_dosages.append(meta_dosage)
-        meta_dosage=0 #reset weighted sum
-    
-    #print(max(meta_dosages), min(meta_dosages))
-    if min(np.round(np.array(meta_dosages),3))>= 0 and max(np.round(np.array(meta_dosages),3)) <= 2: 
-        return(meta_dosages)
-    else: 
-        print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
-        raise ValueError("Meta Dosages Not Between 0 and 2")
 
+        # Second pass: compute dosage
+        if has_nan:
+            # Original fallback: ignore weights; require both present
+            s = sum((d1 + d2) for d1, d2, _ in vals
+                    if not (np.isnan(d1) or np.isnan(d2)))
+        else:
+            # Normal path: use weights
+            s = sum((d1 + d2) * w for d1, d2, w in vals)
+
+        meta_dosages.append(s)
+
+    arr = np.clip(np.array(meta_dosages), 0, 2)
+    return arr.tolist()
 
 # %%
 def calcViterbiDosage(opt_path, sample, allelic_dosages):
