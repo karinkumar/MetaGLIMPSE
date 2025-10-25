@@ -24,12 +24,13 @@ Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The 
 
 -- out:  prefix of outfiles. 
 
+--chr: chromosome ID in vcf file, e.g. 'chr20' or '20'
 ***2. Run Example***
 
 See the example folder for African American input files derived from 1000 Genomes and downsampled to 1x and run the following code once you have installed the program and also have access to python. 
 ```
 
-python3.8 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --zerodosage --out ASWchr20
+python3.8 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --zerodosage --out ASWchr20 --chr 'chr20'
 ```
 
 
