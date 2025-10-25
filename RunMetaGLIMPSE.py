@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.17.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -31,6 +31,7 @@ parser.add_argument("--baum_welch", required = False, dest = 'bw', action = "sto
 parser.add_argument("--viterbi", required = False, dest = 'vbi', action = "store_true")
 parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true")
 parser.add_argument("--zerodosage", required = False, dest = 'zero', action = "store_true")
+parser.add_argument("--chr", required = True, dest = 'chr')
 parser.set_defaults(haploid=False)
 parser.set_defaults(nomixedstate=False)
 parser.set_defaults(pickle=False)
@@ -90,7 +91,7 @@ if args.same:
 elif args.zero: 
     missing = "zero"
 else:
-    missing = "flat" #default correct 
+    missing = "zero" #default correct 
 
 # %%
 start = time.time()
@@ -98,7 +99,7 @@ print("Checking vcfs...")
 assert check_sample_names(GL, *DS_list)
 print("Passed checks .. Chunking vcfs ...")
 L=30000
-regions = get_region_list(*DS_list, chunk_size = L)
+regions = get_region_list(*DS_list, chunk_size = L, CHR = args.chr)
 
 # %%
 for num, r in enumerate(regions):
@@ -123,7 +124,6 @@ for num, r in enumerate(regions):
             pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda_c)
         
         elif vbi:
-            print(vbi)
             print("viterbi used")
             opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
             mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
@@ -136,15 +136,15 @@ for num, r in enumerate(regions):
     #calculate meta dosages
         
             if missing=="flat": 
-                mdosages.append(calcMetaDosages_nan(pst, sample_map(sample), ad))
-        
+                #mdosages.append(calcMetaDosages_nan(pst, sample_map(sample), ad))
+                raise ValueError("must specifiy either --zerodosage or --samedosage")
             else:
                 mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
                 #print("should not be here for viterbi")
     #add to samples
         samples[sample] = list(chain.from_iterable(mdosages))
 
-    write_vcf(samples, SNPs, args.out + str(num))
+    write_vcf(samples, SNPs, args.out + str(num), args.chr)
 
 end = time.time ()
 print("total time is", end - start)
