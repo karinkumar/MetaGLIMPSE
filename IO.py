@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.17.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -29,6 +29,9 @@ epsilon = 1e-5
 
 # %%
 def ds_gt_map(ds): 
+    '''
+    DS is the unphased genotype dosage output of the fwd-bwd algorithm
+    '''
     ds = round(ds)
     if ds==0: 
         return ((0,0))
@@ -40,25 +43,41 @@ def ds_gt_map(ds):
         raise ValueError("DS cannot be other than 0,1,2")
 
 
+# %% [raw]
+# def ap_gt_map(ap): 
+#     '''
+#     AP is the phased result of the viterbi algorithm, represented as a tuple
+#     '''
+#     a,b = ap
+#     A = round(a)
+#     B = round(b)
+#     return ((A | B))
+#     
+#
+
 # %%
-def write_vcf(samples, SNPs, outname, haploid=False): 
+def write_vcf(samples, SNPs, outname, CHR, haploid=False): 
 #write vcf
     vcfh = pysam.VariantHeader()
 # Add a sample named "ahstram" to our VCF header
     for s in samples.keys():
         vcfh.add_sample(s)
 # Add a contig (chromosome 20) to our VCF header
-    vcfh.add_meta('contig', items=[('ID','chr20')])
+    vcfh.add_meta('contig', items=[('ID', CHR)])
     
 # Add GT andDS to FORMAT in our VCF header
-    vcfh.add_meta('FORMAT', items=[('ID',"GT"), ('Number',1), ('Type','String'),
-    ('Description','Best Guess Genotype')])
     vcfh.add_meta('FORMAT', items=[('ID',"DS"), ('Number','A'), ('Type','Float'),
     ('Description','Meta Imputed Genotype Dosage')])
-    vcfh.add_line("##FPLOIDY=1")
-
-    vcfh.add_meta('FORMAT', items=[('ID',"GP"), ('Number',3), ('Type','Float'),
-    ('Description','Meta Imputed Genotype Dosage')])
+    
+    vcfh.add_meta('FORMAT', items=[('ID',"GT"), ('Number',1), ('Type','String'), ('Description','Best Guess Genotype')])
+         
+    
+    if not haploid:
+        vcfh.add_line("##FPLOIDY=2")
+    else:
+        vcfh.add_line("##FPLOIDY=1")
+        
+    vcfh.add_meta('INFO', items=[('ID',"R2"), ('Number',1), ('Type','Float'),('Description','Meta Imputed Estimated R2')])
     
 # Open a file, "example.vcf" for writing, with our "vcfh" header
     vcf = pysam.VariantFile(outname + ".vcf.gz", "w", header=vcfh)
@@ -67,16 +86,31 @@ def write_vcf(samples, SNPs, outname, haploid=False):
 # The 'start' value is 0-based, 'stop' is 1-based
     for s,val in enumerate(SNPs): 
         ID = str.split(val, ":")
-        r=vcf.new_record(contig='chr20', start=int(ID[1]) - 1 , stop=int(ID[1]),
+        #print(CHR)
+        r=vcf.new_record(contig=CHR, start=int(ID[1]) - 1 , stop=int(ID[1]),
             alleles=[ID[2],ID[3]])
+        dosages = list()
         for sample in samples.keys():
         # Set dosage
+            ds = round(samples[sample][s], 3)
+            dosages.append(ds)
             r.samples[sample]['DS'] = round(samples[sample][s], 3) #round to account for underflow clipping and to match GLIMPSE DS. 
+            
             if haploid: 
                 r.samples[sample]['GT'] = round(samples[sample][s])
-            else: 
+            else:
                 r.samples[sample]['GT'] = ds_gt_map(samples[sample][s])
-            #r.samples[sample]['GP'] = (1,0,0)
+
+        dosages = np.array(dosages)
+        mu = np.mean(dosages)
+        var = np.var(dosages, ddof=0)
+        theta = mu / 2
+        if theta > 0 and theta < 1:  # avoid division by zero
+            impute_r2 = var / (2 * theta * (1 - theta))
+        else:
+            impute_r2 = 1
+
+        r.info['R2'] = round(impute_r2, 3)  # Add INFO tag
 
         # Write this record to our VCF file
         vcf.write(r)
@@ -171,7 +205,7 @@ def check_sample_names(GL_path, *DS_paths):
 
 
 # %%
-def get_region_list(*DS_paths, chunk_size):
+def get_region_list(*DS_paths, chunk_size, CHR):
     # Join the file paths into a single string for the command
     files = " ".join(DS_paths)
     cmd = f"bcftools isec -n +1 {files}"
@@ -194,7 +228,7 @@ def get_region_list(*DS_paths, chunk_size):
     print("Number of Chunks is ..", len(chunks))
     print("Chunk size is...", L)
     
-    regions = ['chr20' + ':' + pos[c[0]] + '-' + pos[c[len(c) - 2]] for c in chunks] #-2 because -1 gets to the last value in the python range but python only subsets upto the last value in the range
+    regions = [f'{CHR}' + ':' + pos[c[0]] + '-' + pos[c[len(c) - 2]] for c in chunks] #-2 because -1 gets to the last value in the python range but python only subsets upto the last value in the range
     
     return regions
     

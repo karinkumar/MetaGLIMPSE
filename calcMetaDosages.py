@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.17.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -42,6 +42,22 @@ def calcMetaDosages(posteriors, sample, allelic_dosages):
     else: 
         print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
         raise ValueError("Meta Dosages Not Between 0 and 2")
+
+
+# %%
+def calcViterbiDosage(opt_path, sample, allelic_dosages):
+    meta_dosages=list()
+    for m in range(len(opt_path)): 
+        allele_1, allele_2 = opt_path[m]
+        a,b = allele_1
+        c,d = allele_2
+        mg = allelic_dosages[a-1][b-1][sample][m], allelic_dosages[c-1][d-1][sample][m]
+        meta_dosages.append(mg)
+    #if min(np.round(np.array(meta_dosages),3))>= 0 and max(np.round(np.array(meta_dosages),3)) <= 2: 
+    return(meta_dosages)
+    #else: 
+        #print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
+        #raise ValueError("Meta Dosages Not Between 0 and 2")
 
 
 # %%
@@ -89,59 +105,41 @@ def calcMetaDosages_nan(posteriors, sample, allelic_dosages):
         print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
         raise ValueError("Meta Dosages Not Between 0 and 2")
 
+# %% [markdown]
+# #test case missing values um gpt inspired
+#
+# posteriors0 = [
+#     {((1, 1), (1, 2)): 0.333333333333333, ((2, 1), (2, 2)): 0.3333333333, ((1,1), (2,2)): 0.333333333},
+# ]
+# sample = 0
+# allelic_dosages = np.array([
+#     [
+#         # Reference Panel 1
+#         [[0.1], [0.6]]  # Alleles dosage for the first marker (e.g., from panel 1)
+#     ],
+#     [
+#         # Reference Panel 2
+#         [[np.nan], [np.nan]]  # Alleles dosage for the first marker (e.g., from panel 2)
+#     ]
+# ])
+# allelic_dosages.shape = (2,2,1,1)
+# calcMetaDosages_nan(posteriors0, sample, allelic_dosages)
 
-# %%
-def calcViterbiDosage(opt_path, sample, allelic_dosages):
-    meta_dosages=list()
-    for m in range(len(opt_path)): 
-        allele_1, allele_2 = opt_path[m]
-        a,b = allele_1
-        c,d = allele_2
-        mg = allelic_dosages[a-1][b-1][sample][m] + allelic_dosages[c-1][d-1][sample][m]
-        meta_dosages.append(mg)
-    if min(np.round(np.array(meta_dosages),3))>= 0 and max(np.round(np.array(meta_dosages),3)) <= 2: 
-        return(meta_dosages)
-    else: 
-        print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
-        raise ValueError("Meta Dosages Not Between 0 and 2")
-    return meta_dosages
-
-
-# %%
-#test case missing values um gpt inspired
-
-posteriors0 = [
-    {((1, 1), (1, 2)): 0.333333333333333, ((2, 1), (2, 2)): 0.3333333333, ((1,1), (2,2)): 0.333333333},
-]
-sample = 0
-allelic_dosages = np.array([
-    [
-        # Reference Panel 1
-        [[0.1], [0.6]]  # Alleles dosage for the first marker (e.g., from panel 1)
-    ],
-    [
-        # Reference Panel 2
-        [[np.nan], [np.nan]]  # Alleles dosage for the first marker (e.g., from panel 2)
-    ]
-])
-allelic_dosages.shape = (2,2,1,1)
-calcMetaDosages_nan(posteriors0, sample, allelic_dosages)
-
-# %%
-#test case no missing values
-posteriors = [
-    {((1, 1), (1, 2)): 0.5, ((2, 1), (2, 2)): 0.5},
-]
-sample = 0
-allelic_dosages = np.array([
-    [
-        # Reference Panel 1
-        [[0.1], [0.6]]  # Alleles dosage for the first marker (e.g., from panel 1)
-    ],
-    [
-        # Reference Panel 2
-        [[0.2], [0.2]]  # Alleles dosage for the first marker (e.g., from panel 2)
-    ]
-])
-allelic_dosages.shape = (2,2,1,1)
-calcMetaDosages_nan(posteriors0, sample, allelic_dosages)
+# %% [raw]
+# #test case no missing values
+# posteriors = [
+#     {((1, 1), (1, 2)): 0.5, ((2, 1), (2, 2)): 0.5},
+# ]
+# sample = 0
+# allelic_dosages = np.array([
+#     [
+#         # Reference Panel 1
+#         [[0.1], [0.6]]  # Alleles dosage for the first marker (e.g., from panel 1)
+#     ],
+#     [
+#         # Reference Panel 2
+#         [[0.2], [0.2]]  # Alleles dosage for the first marker (e.g., from panel 2)
+#     ]
+# ])
+# allelic_dosages.shape = (2,2,1,1)
+# calcMetaDosages_nan(posteriors0, sample, allelic_dosages)

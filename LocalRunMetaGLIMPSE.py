@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.17.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -24,10 +24,10 @@ if haploid and mixed_states: #sanity check override user
 
 #GL = "/net/fantasia/home/kiranhk/1kg30xEUR/gl/"
 
-GL = "/net/fantasia/home/kiranhk/Samoans/gl/bcftoolsgenogvcfs2x.vcf.gz"
+GL = "/net/fantasia/home/kiranhk/1kg30xASW/gl/bcftoolsgenogvcfs4x.vcf.gz"
 
-DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/Samoan_samoanpanel_2xchr20.vcf.gz", 
-          "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/Samoan_topmednosamoans_2xchr20.vcf.gz"]
+DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsEUR_no1kgsingleton_0.1xchr20.vcf.gz", 
+           "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsAFR_no1kgsingleton_0.1xchr20.vcf.gz"]
 K = len(DS_list)
 print("mixed states are...", mixed_states, "... with", K, "reference panels", "outer join is..", outer)
 
@@ -58,18 +58,28 @@ from NelderMead import objective, evaluate
 from Viterbi import viterbi
 EM=False
 Nelder=False
-Vbi=True
+Vbi=False
+
+# %%
+import os
+
+# Make sure /usr/local/bin is at the front of the PATH for this process (and all subprocesses)
+os.environ["PATH"] = "/usr/local/bin:" + os.environ["PATH"]
 
 # %%
 print("Checking vcfs...")
 assert check_sample_names(GL, *DS_list)
 print("Passed checks .. Chunking vcfs ...")
 L=30000
-regions = get_region_list(*DS_list, chunk_size = L)
+regions = get_region_list(*DS_list, chunk_size = L, CHR = 'chr20')
 
 # %%
-#np.save("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy", regions)
-regions = np.load("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy")
+regions
+
+# %% [raw]
+# #np.save("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy", regions)
+# regions = np.load("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy")
+# #regions
 
 # %%
 #start timing
@@ -81,7 +91,7 @@ chunk_num = 0
   
      
 start = time.time()
-SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "same") 
+SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "zero") 
 assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
 assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
 assert len(dicto) == gl.shape[1] #check sample names are equivalent
@@ -93,7 +103,10 @@ lmbda, diffs = calcLambda(SNPs, start_c)
 total_distance = np.sum(diffs)
 
 lda = calcNumFlips(lmbda, len(Hidden)) #initial lda for all samples
-for sample in dicto.keys(): 
+
+
+# %%
+for sample in ["NWD100595"]: #dicto.keys() 
     mdosages = []
     #weightsc = []
     print("Meta Imputing sample ...", sample, "in region", r)
@@ -120,7 +133,7 @@ for sample in dicto.keys():
 #add to samples
     samples[sample] = list(chain.from_iterable(mdosages))
 
-write_vcf(samples, SNPs, 'results/chunks/samoan_viterbi_samedosage_test' + str(chunk_num))
+write_vcf(samples, SNPs, 'results/chunks/samoan_zerodosage_test_R2' + str(chunk_num), str.split(r, ":")[0])
 
 #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()
