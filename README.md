@@ -81,5 +81,5 @@ This will give you a file of the name [output file name].txt
 
 Second, run MetaGLIMPSE_chunk.py (This runs MetaGLIMPSE in a single chunk--you will need to parallelize yourself, e.g. in a bash script or snakemake). The --region command refers to the nth chunk. So if you want to impute the first chunk, --region 0 (we are in python, so the first index is 0 rather than 1).
 ```
-python3.8 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks --chr'chr20'YOUR_CHUNK_FILE.txt
+python3.8 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks 'YOUR_CHUNK_FILE.txt --chr 'chr20'
 ```
