@@ -84,7 +84,9 @@ Second, run MetaGLIMPSE_chunk.py (This runs MetaGLIMPSE in a single chunk--you w
 python3.8 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks 'YOUR_CHUNK_FILE.txt --chr 'chr20'
 ```
 
-****FAQ****
+****Frequently Asked Questions (FAQ) ****
+
+
 Q: Can I use GLIMPSE 1 with MetaGLIMPSE?
 
 A: At this time, MetaGLIMPSE only supports GLIMPSE2 results (AP option branch).
