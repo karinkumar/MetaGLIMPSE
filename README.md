@@ -3,7 +3,7 @@ Meta Imputation of Low Coverage Sequencing
 
 ***Overview***
 
-This method takes the results from two or more single panel GLIMPSE2 imputations and combines the output using weights estimated via HMM for each individual and marker. Note: This only supports GLIMPSE2 results as this time, not GLIMPSE1
+This method takes the results from two or more single panel GLIMPSE2 imputations and combines the output using weights estimated via HMM for each individual and marker.
 
 The output of this method is a vcf file at the union set of markers in each input file with the estimated genotype dosage for each sample and marker.
 
@@ -83,3 +83,9 @@ Second, run MetaGLIMPSE_chunk.py (This runs MetaGLIMPSE in a single chunk--you w
 ```
 python3.8 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks 'YOUR_CHUNK_FILE.txt --chr 'chr20'
 ```
+
+*FAQ*
+Q: Can I use GLIMPSE 1 with MetaGLIMPSE?
+
+A: At this time, MetaGLIMPSE only supports GLIMPSE2 results (AP option branch).
+
