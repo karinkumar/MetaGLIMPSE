@@ -29,9 +29,10 @@ parser.add_argument("--chunk_size", required = False, dest = 'L')
 parser.add_argument("--recomb_rate", required = False, dest = 'c_start', type = float)
 parser.add_argument("--baum_welch", required = False, dest = 'bw', action = "store_true")
 parser.add_argument("--viterbi", required = False, dest = 'vbi', action = "store_true")
-parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true")
-parser.add_argument("--zerodosage", required = False, dest = 'zero', action = "store_true")
+parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true", help = "EXPERT USER ONLY: sets the dosages not polymorphic in both panels to be the same.")
+parser.add_argument("--zerodosage", required = False, dest = 'zero', action = "store_true", help = "sets the dosages not polymorphic in both panels to be zero. This is the version used in the manuscript.")
 parser.add_argument("--chr", required = True, dest = 'chr')
+parser.add_argument("--phased", required = False)
 parser.set_defaults(haploid=False)
 parser.set_defaults(nomixedstate=False)
 parser.set_defaults(pickle=False)
@@ -52,7 +53,7 @@ print("mixed states are...", mixed_states)
 if vbi and bw: 
     raise ValueError("Cannot use both Baum-Welch and Viterbi algorithms. Must choose 1")
 
-if vbi: 
+if vbi or args.phased: 
     print("Viterbi algorithm in use")
     
 GL = args.gl 
@@ -75,11 +76,11 @@ if haploid:
     from MetaMinimac import emission_prob, transition_prob, calcNumFlips, calcMetaDosages
 else: 
     from TEProb import transition_prob, emission_prob
-    from calcMetaDosages import calcMetaDosages, calcMetaDosages_nan, calcViterbiDosage
+    from calcMetaDosages import calcMetaDosages, calcMetaDosages_nan, calcViterbiDosage, phasingPath
 if haploid: 
     from calcDistMat import extract_int, calcLambda
 else: 
-    from calcDistMat import extract_int, calcLambda, calcNumFlips
+    from calcDistMat import extract_int, calcLambda, calcNumFlips, calcNumFlips_phased
 from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list
 from HiddenStates import generate_hidden
 from Viterbi import viterbi
@@ -111,8 +112,10 @@ for num, r in enumerate(regions):
 
     samples = {}
     lmbda, diffs = calcLambda(SNPs, start_c)
-    total_distance = np.sum(diffs)
-    lda = calcNumFlips(lmbda, len(Hidden))
+    if args.phased: 
+        lda = calcNumFlips_phased(lmbda, len(Hidden))
+    else:
+        lda = calcNumFlips(lmbda, len(Hidden))
     #lda = calcNumFlips(calcLambda(SNPs, c_start)[0], len(Hidden)) #do this once and then subset
     for sample in dicto.keys(): 
         mdosages = []
@@ -120,6 +123,7 @@ for num, r in enumerate(regions):
     #subset data structures
         og_transformed = gl[sample]
         if bw: #baum welch option
+            total_distance = np.sum(diffs)
             lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
             pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda_c)
         
@@ -127,7 +131,12 @@ for num, r in enumerate(regions):
             print("viterbi used")
             opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
             mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
-            #print("viterbi used")
+       
+        elif args.phased:  
+            opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            phased_path = phasingPath(opt_path)
+            mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad))  
+        
         else: #fwdbwd 
     #calculate posteriors
         # #%timeit 
@@ -144,7 +153,7 @@ for num, r in enumerate(regions):
     #add to samples
         samples[sample] = list(chain.from_iterable(mdosages))
 
-    write_vcf(samples, SNPs, args.out + str(num), args.chr)
+    write_vcf(samples, SNPs, args.out + str(num), args.chr, phased = args.phased)
 
 end = time.time ()
 print("total time is", end - start)

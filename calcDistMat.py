@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.17.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -54,6 +54,15 @@ def calcNumFlips(lda, H):
     arr[:,0] = (1 - lda)**2 + (2*(lda - lda**2))/H + lda**2/(H**2) #numflips is 0
     arr[:, 1] = ((1 - lda)*lda)/H + (lda**2)/H**2
     arr[:, 2] = (lda**2)/(H**2)
+    return(arr)
+
+
+# %%
+def calcNumFlips_phased(lda, H):
+    #print(H)
+    arr = np.zeros((lda.size, 3))
+    arr[:,0] = (1 - lda)**2 + (2*(lda - lda**2))/H + lda**2/(H**2) #numflips is 0
+    arr[:, 1] = ((1 - lda)*lda)/H + 2*(lda**2)/H**2
     return(arr)
 
 # %% [raw]

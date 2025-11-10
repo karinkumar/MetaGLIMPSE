@@ -43,20 +43,22 @@ def ds_gt_map(ds):
         raise ValueError("DS cannot be other than 0,1,2")
 
 
+# %%
+def ap_gt_map(ap): 
+    '''
+    AP is the phased result of the viterbi algorithm, represented as a tuple
+    '''
+    a,b = ap
+    return round(a), round(b)
+    
+
+
 # %% [raw]
-# def ap_gt_map(ap): 
-#     '''
-#     AP is the phased result of the viterbi algorithm, represented as a tuple
-#     '''
-#     a,b = ap
-#     A = round(a)
-#     B = round(b)
-#     return ((A | B))
-#     
-#
+# print(ap_gt_map((0.04, 1.01)))  # Output should be "0|1"
+# print(ap_gt_map((1.5, 0.4)))    # Output should be "1|0"
 
 # %%
-def write_vcf(samples, SNPs, outname, CHR, haploid=False): 
+def write_vcf(samples, SNPs, outname, CHR, haploid=False, phased=False): 
 #write vcf
     vcfh = pysam.VariantHeader()
 # Add a sample named "ahstram" to our VCF header
@@ -69,8 +71,11 @@ def write_vcf(samples, SNPs, outname, CHR, haploid=False):
     vcfh.add_meta('FORMAT', items=[('ID',"DS"), ('Number','A'), ('Type','Float'),
     ('Description','Meta Imputed Genotype Dosage')])
     
-    vcfh.add_meta('FORMAT', items=[('ID',"GT"), ('Number',1), ('Type','String'), ('Description','Best Guess Genotype')])
-         
+       
+    if phased: 
+        vcfh.add_meta('FORMAT', items=[('ID',"GT"), ('Number',1), ('Type','String'), ('Description','Best Guess Phased Genotype')])
+    else:
+        vcfh.add_meta('FORMAT', items=[('ID',"GT"), ('Number',1), ('Type','String'), ('Description','Best Guess Genotype')])
     
     if not haploid:
         vcfh.add_line("##FPLOIDY=2")
@@ -92,13 +97,20 @@ def write_vcf(samples, SNPs, outname, CHR, haploid=False):
         dosages = list()
         for sample in samples.keys():
         # Set dosage
-            ds = round(samples[sample][s], 3)
-            dosages.append(ds)
-            r.samples[sample]['DS'] = round(samples[sample][s], 3) #round to account for underflow clipping and to match GLIMPSE DS. 
-            
-            if haploid: 
+            #print(samples[sample][s])
+            if phased: 
+                #print(samples[sample][s])
+                ds = round(sum(samples[sample][s]),3)
+                dosages.append(ds)
+                r.samples[sample]['DS'] = ds
+                r.samples[sample]['GT'] = ap_gt_map(samples[sample][s])
+                r.samples[sample].phased = True
+            elif haploid: 
                 r.samples[sample]['GT'] = round(samples[sample][s])
-            else:
+            else: 
+                ds = round(samples[sample][s], 3)
+                dosages.append(ds)
+                r.samples[sample]['DS'] = ds #round to account for underflow clipping and to match GLIMPSE DS. 
                 r.samples[sample]['GT'] = ds_gt_map(samples[sample][s])
 
         dosages = np.array(dosages)
@@ -313,10 +325,10 @@ def read_vcfs_genK_region(GL_path, *DS_paths, region, outer = True, missing_hand
 #all dosage str --> tuple 
     if ploidy==2: #for 0 dosage case only applies in outer merge case but still need to convert to tuple
         if missing_handling == "flat":
-            all_dosage = all_dosage.applymap(lambda x: (np.nan, np.nan) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+            all_dosage = all_dosage.map(lambda x: (np.nan, np.nan) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
             print("flat emission probability for missing variants")
         elif missing_handling == "zero": 
-            all_dosage = all_dosage.applymap(lambda x: (0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+            all_dosage = all_dosage.map(lambda x: (0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
             print("missing dosages are set equal to 0")
         elif missing_handling == "same" and len(DS_paths) == 2: #only for 2 reference panels
             print("missing dosages are set equal to the dosage in the other reference panel")
@@ -337,15 +349,15 @@ def read_vcfs_genK_region(GL_path, *DS_paths, region, outer = True, missing_hand
     #if its not in both reference panels, it shouldn't be here!
             if all_dosage.isnull().values.any(): 
                 raise ValueError("Some marker is not in both reference panels")
-            all_dosage = all_dosage.applymap(lambda x: tuple(json.loads("[" + x + "]")))
+            all_dosage = all_dosage.map(lambda x: tuple(json.loads("[" + x + "]")))
     
 #GL tuple, unphred
     if ploidy == 1: 
-        all_GL = all_GL.applymap(lambda x: (0,0) if pd.isna(x) else tuple(json.loads("[" + x + "]")))
+        all_GL = all_GL.map(lambda x: (0,0) if pd.isna(x) else tuple(json.loads("[" + x + "]")))
     elif ploidy == 2: 
-        all_GL = all_GL.applymap(lambda x: (0,0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
+        all_GL = all_GL.map(lambda x: (0,0,0) if x == '.' or pd.isna(x) else tuple(json.loads("[" + x + "]")))
     #print("unphred finished")
-    pos = (all_GL.applymap(len)).apply(any, axis = 1)
+    pos = (all_GL.map(len)).apply(any, axis = 1)
     assert all(pos) #check for len = 0 "truthy" means 0 is false and everything else is true
     assert np.all(all_GL.index == all_dosage.index) #check SNPs
     SNPs = all_dosage.index #output 1

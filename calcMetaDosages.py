@@ -51,13 +51,45 @@ def calcViterbiDosage(opt_path, sample, allelic_dosages):
         allele_1, allele_2 = opt_path[m]
         a,b = allele_1
         c,d = allele_2
-        mg = allelic_dosages[a-1][b-1][sample][m], allelic_dosages[c-1][d-1][sample][m]
-        meta_dosages.append(mg)
+        meta_dosages.append((allelic_dosages[a-1][b-1][sample][m],allelic_dosages[c-1][d-1][sample][m]))
     #if min(np.round(np.array(meta_dosages),3))>= 0 and max(np.round(np.array(meta_dosages),3)) <= 2: 
     return(meta_dosages)
     #else: 
-        #print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
-        #raise ValueError("Meta Dosages Not Between 0 and 2")
+       # print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
+       # raise ValueError("Meta Dosages Not Between 0 and 2")
+ 
+
+
+# %%
+def phasingPath(opt_path): 
+    '''
+    Determine the phased haplotypes from the optimal viterbi path
+    '''
+    phase_path = []
+    previous = opt_path[0]
+    phase_path.append(opt_path[0])
+    for m in range(1,len(opt_path)): 
+        if opt_path[m] == previous: 
+            #keep things the same
+            phase_path.append(opt_path[m])
+        else:
+            #decompose
+            A, B = opt_path[m]
+            C, D = previous
+            if A==C or B==D:
+                phase_path.append(opt_path[m])
+            elif A==D or B==C:
+                #print("flip")
+                #print("previous",(C,D))
+                #print("next", (A,B))
+                #print("corrected", (B,A))
+            
+                phase_path.append((B,A))
+               
+            else: 
+                raise ValueError("Cannot have num flips==2")
+        previous = phase_path[m] #previous is now the correctly phased path
+    return phase_path
 
 
 # %%

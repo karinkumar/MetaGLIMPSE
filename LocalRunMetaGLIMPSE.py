@@ -24,7 +24,7 @@ if haploid and mixed_states: #sanity check override user
 
 #GL = "/net/fantasia/home/kiranhk/1kg30xEUR/gl/"
 
-GL = "/net/fantasia/home/kiranhk/1kg30xASW/gl/bcftoolsgenogvcfs4x.vcf.gz"
+GL = "/net/fantasia/home/kiranhk/1kg30xASW/gl/bcftoolsgenogvcfs0.1x.vcf.gz"
 
 DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsEUR_no1kgsingleton_0.1xchr20.vcf.gz", 
            "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsAFR_no1kgsingleton_0.1xchr20.vcf.gz"]
@@ -43,11 +43,11 @@ if haploid:
     from MetaMinimac import emission_prob, transition_prob, calcNumFlips, calcMetaDosages
 else: 
     from TEProb import transition_prob, emission_prob
-    from calcMetaDosages import calcMetaDosages, calcViterbiDosage
+    from calcMetaDosages import calcMetaDosages, calcViterbiDosage, phasingPath
 if haploid: 
     from calcDistMat import extract_int, calcLambda
 else: 
-    from calcDistMat import extract_int, calcLambda, calcNumFlips
+    from calcDistMat import extract_int, calcLambda, calcNumFlips, calcNumFlips_phased
 from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list
 from HiddenStates import generate_hidden
 Hidden = generate_hidden(K, mixed_states, haploid)    
@@ -59,6 +59,7 @@ from Viterbi import viterbi
 EM=False
 Nelder=False
 Vbi=False
+phased = True
 
 # %%
 import os
@@ -73,9 +74,6 @@ print("Passed checks .. Chunking vcfs ...")
 L=30000
 regions = get_region_list(*DS_list, chunk_size = L, CHR = 'chr20')
 
-# %%
-regions
-
 # %% [raw]
 # #np.save("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy", regions)
 # regions = np.load("/net/fantasia/home/kiranhk/HMM/samoan_test_regions.npy")
@@ -84,7 +82,7 @@ regions
 # %%
 #start timing
 n_iter = 10
-start_c = 0
+start_c = 2e-7
 r = regions[0] #r = args.region
 chunk_num = 0 
 #for num, r in enumerate(regions):
@@ -102,11 +100,14 @@ samples = {}
 lmbda, diffs = calcLambda(SNPs, start_c)
 total_distance = np.sum(diffs)
 
-lda = calcNumFlips(lmbda, len(Hidden)) #initial lda for all samples
+if not phased: 
+    lda = calcNumFlips(lmbda, len(Hidden))
+else: 
+    lda = calcNumFlips_phased(lmbda, len(Hidden))#initial lda for all samples
 
 
 # %%
-for sample in ["NWD100595"]: #dicto.keys() 
+for sample in ["NA20342"]: #dicto.keys():
     mdosages = []
     #weightsc = []
     print("Meta Imputing sample ...", sample, "in region", r)
@@ -121,11 +122,17 @@ for sample in ["NWD100595"]: #dicto.keys()
     elif Nelder:  
         evaluate(Hidden, og_transformed.size, list(og_transformed), emission_prob, transition_prob, sample_map(sample), ad, SNPs)
 
-    elif Vbi: 
+    elif Vbi:
         opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
         mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
-        #print(opt_path)
+        
         #print(mdosages)
+    elif phased: 
+        opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+        #print(opt_path[0:10])
+        phased_path = phasingPath(opt_path)
+        #print(phased_path[0:10])
+        mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad))   
     else: #plain fwd-bwd as in paper 1
     #use jumpfix forward backward function--scaling only required for baum welch.
         pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
@@ -133,7 +140,7 @@ for sample in ["NWD100595"]: #dicto.keys()
 #add to samples
     samples[sample] = list(chain.from_iterable(mdosages))
 
-write_vcf(samples, SNPs, 'results/chunks/samoan_zerodosage_test_R2' + str(chunk_num), str.split(r, ":")[0])
+write_vcf(samples, SNPs, 'results/chunks/asw_phased_test_R2' + str(chunk_num), str.split(r, ":")[0], phased = phased)
 
 #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()

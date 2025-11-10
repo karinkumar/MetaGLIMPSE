@@ -22,6 +22,7 @@ parser.add_argument("--dosages", required=True, nargs ='+', help = "Specify one 
 parser.add_argument("--gl", required = True, help = "Specify low coverage sequence data genotype likelihoods in phred scale")
 parser.add_argument("--outname", required = True, help = "Specify prefix for output file")
 parser.add_argument("--chunk_size", required = False, dest = 'L')
+parser.add_argument("--chr", required = True, dest = 'chr')
 args = parser.parse_args()
 
 GL = args.gl 
@@ -33,7 +34,7 @@ K = len(DS_list)
 if K < 2 or K > 6: 
     raise ValueError("Must have 2 reference panels to meta impute and cannot meta impute more than 6 panels")
 L=30000
-regions = get_region_list(*DS_list, chunk_size = L)
+regions = get_region_list(*DS_list, chunk_size = L, CHR = args.chr)
 #write out as text file 
 
 
