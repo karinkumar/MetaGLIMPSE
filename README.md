@@ -32,7 +32,7 @@ Once you enter the MetaGLIMPSE folder, the executable is RunMetaGLIMPSE.py. The 
 See the example folder for African American input files derived from 1000 Genomes and downsampled to 1x and run the following code once you have installed the program and also have access to python. 
 ```
 
-python3.8 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --zerodosage --out ASWchr20 --chr 'chr20'
+python3.11 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --zerodosage --out ASWchr20 --chr 'chr20'
 ```
 
 
@@ -75,13 +75,13 @@ These last four options are *essential* in obtaining the correct results in both
 **5 Run MetaGLIMPSE in parallel by chunk**
 To run MetaGLIMPSE significantly faster (e.g. if you have 30 chunks, it will run 30x faster assuming you have 30 cores/nodes available to parallelize on), you can do the following. First, chunk the code. 
 ```
-python3.8 chunker.py --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz --outname YOUR_OUTPUT_NAME.txt --chr 'chr20'
+python3.11 chunker.py --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz --outname YOUR_OUTPUT_NAME.txt --chr 'chr20'
 ```
 This will give you a file of the name [output file name].txt
 
 Second, run MetaGLIMPSE_chunk.py (This runs MetaGLIMPSE in a single chunk--you will need to parallelize yourself, e.g. in a bash script or snakemake). The --region command refers to the nth chunk. So if you want to impute the first chunk, --region 0 (we are in python, so the first index is 0 rather than 1).
 ```
-python3.8 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks 'YOUR_CHUNK_FILE.txt --chr 'chr20'
+python3.11 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks 'YOUR_CHUNK_FILE.txt --chr 'chr20'
 ```
 
 ****Frequently Asked Questions (FAQ)****
