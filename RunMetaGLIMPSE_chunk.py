@@ -6,7 +6,7 @@
 #       extension: .py
 #       format_name: percent
 #       format_version: '1.3'
-#       jupytext_version: 1.14.4
+#       jupytext_version: 1.17.2
 #   kernelspec:
 #     display_name: Python 3 (ipykernel)
 #     language: python
@@ -15,7 +15,10 @@
 
 # %%
 ###command line interface###
+import os
 
+# Make sure /usr/local/bin is at the front of the PATH for this process (and all subprocesses)
+os.environ["PATH"] = "/usr/local/bin:" + os.environ["PATH"]
 import argparse
 import numpy as np
 parser = argparse.ArgumentParser()
@@ -32,6 +35,8 @@ parser.add_argument("--baum_welch", required = False, dest = 'bw', action = "sto
 parser.add_argument("--viterbi", required = False, dest = 'vbi', action = "store_true")
 parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true")
 parser.add_argument("--zerodosage", required = False, dest = 'zero', action = "store_true")
+parser.add_argument("--chr", required = True)
+parser.add_argument("--phased", required = False)
 parser.set_defaults(haploid=False)
 parser.set_defaults(nomixedstate=False)
 parser.set_defaults(pickle=False)
@@ -54,7 +59,7 @@ print("mixed states are...", mixed_states)
 if vbi and bw: 
     raise ValueError("Cannot use both Baum-Welch and Viterbi algorithms. Must choose 1")
 
-if vbi: 
+if vbi or args.phased: 
     print("Viterbi algorithm in use")
     
 GL = args.gl 
@@ -63,6 +68,8 @@ DS_list = args.dosages
 K=len(DS_list)
 
 
+
+# %%
 
 # %%
 import pickle
@@ -75,11 +82,11 @@ if haploid:
     from MetaMinimac import emission_prob, transition_prob, calcNumFlips, calcMetaDosages
 else: 
     from TEProb import transition_prob, emission_prob
-    from calcMetaDosages import calcMetaDosages, calcMetaDosages_nan, calcViterbiDosage
+    from calcMetaDosages import calcMetaDosages, calcMetaDosages_nan, calcViterbiDosage, phasingPath
 if haploid: 
     from calcDistMat import extract_int, calcLambda
 else: 
-    from calcDistMat import extract_int, calcLambda, calcNumFlips
+    from calcDistMat import extract_int, calcLambda, calcNumFlips, calcNumFlips_phased
 from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list
 from HiddenStates import generate_hidden
 from Viterbi import viterbi
@@ -91,11 +98,9 @@ if args.same:
 elif args.zero: 
     missing = "zero"
 else:
-    missing = "flat" #default correct 
+    missing = "zero" #default correct 
 
 # %%
-n_iter = 10
-start_c = 0
 print(idx)
 r = regions[idx] 
 chunk_num = idx
@@ -115,6 +120,8 @@ lmbda, diffs = calcLambda(SNPs, start_c)
 total_distance = np.sum(diffs)
 
 lda = calcNumFlips(lmbda, len(Hidden)) #initial lda for all samples
+
+# %%
 for sample in dicto.keys(): 
     mdosages = []
     #weightsc = []
@@ -125,13 +132,19 @@ for sample in dicto.keys():
 #calculate posteriors
     # #%timeit 
     if bw:
+        n_iter = 10
+        start_c = 0
         lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
 
     elif vbi: 
         opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
         mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
-        #print(opt_path)
-        #print(mdosages)
+    elif args.phased: 
+        opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+        #print(opt_path[0:10])
+        phased_path = phasingPath(opt_path)
+        #print(phased_path[0:10])
+        mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad))   
     else: #plain fwd-bwd as in paper 1
     #use jumpfix forward backward function--scaling only required for baum welch.
         pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
@@ -139,7 +152,8 @@ for sample in dicto.keys():
 #add to samples
     samples[sample] = list(chain.from_iterable(mdosages))
 
-write_vcf(samples, SNPs, args.out)
+print(args.out)
+write_vcf(samples, SNPs, args.out + str(chunk_num), args.chr, phased = args.phased)
 
 #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()
