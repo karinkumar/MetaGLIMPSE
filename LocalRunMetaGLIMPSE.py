@@ -24,10 +24,10 @@ if haploid and mixed_states: #sanity check override user
 
 #GL = "/net/fantasia/home/kiranhk/1kg30xEUR/gl/"
 
-GL = "/net/fantasia/home/kiranhk/1kg30xASW/gl/bcftoolsgenogvcfs0.1x.vcf.gz"
+GL = "/net/fantasia/home/kiranhk/1kg30xEUR/HG00096_chr20_2x.vcf.gz"
 
-DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsEUR_no1kgsingleton_0.1xchr20.vcf.gz", 
-           "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/ASWbcftoolsAFR_no1kgsingleton_0.1xchr20.vcf.gz"]
+DS_list = ["/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/EUR/no_HG00096_EURAdiploid_2xchr20.vcf.gz", 
+           "/net/fantasia/home/kiranhk/software/GLIMPSE2_for_kiran_kumar/GLIMPSE_ligate/EUR/no_HG00096_EURBdiploid_2xchr20.vcf.gz"]
 K = len(DS_list)
 print("mixed states are...", mixed_states, "... with", K, "reference panels", "outer join is..", outer)
 
@@ -37,6 +37,7 @@ import pandas as pd
 import numpy as np
 from itertools import chain
 import time
+import timeit
 #import cProfile
 from PosteriorProb import fwd_bwd
 if haploid:
@@ -48,7 +49,7 @@ if haploid:
     from calcDistMat import extract_int, calcLambda
 else: 
     from calcDistMat import extract_int, calcLambda, calcNumFlips, calcNumFlips_phased
-from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list
+from IO import write_vcf, ds_gt_map, read_vcfs_genK_region, check_sample_names, get_region_list, read_vcfs_genK_region_old
 from HiddenStates import generate_hidden
 Hidden = generate_hidden(K, mixed_states, haploid)    
 def sample_map(sampleID):
@@ -84,65 +85,81 @@ regions = get_region_list(*DS_list, chunk_size = L, CHR = 'chr20')
 n_iter = 10
 start_c = 2e-7
 r = regions[0] #r = args.region
-chunk_num = 0 
-#for num, r in enumerate(regions):
+#chunk_num = 0
+sum_not_missing = 0
+for num, r in enumerate(regions):
   
      
-start = time.time()
-SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "zero") 
-assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
-assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
-assert len(dicto) == gl.shape[1] #check sample names are equivalent
+#start = time.time()
+    SNPs, dicto, gl, ad, mask_r = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = "zero")
+# #%timeit SNPs, dicto, gl, ad = read_vcfs_genK_region_old(GL, *DS_list, region = r, outer = True, missing_handling = "zero") 
+#print(mask_r)
+#print(type(mask_r))
+    #sum_not_missing += (~mask_r.any(axis=1)).sum()
+    
 
-samples = {}
+
+    assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
+    assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
+    assert len(dicto) == gl.shape[1] #check sample names are equivalent
+
+    samples = {}
 #weights = {}
 
-lmbda, diffs = calcLambda(SNPs, start_c)
-total_distance = np.sum(diffs)
+    lmbda, diffs = calcLambda(SNPs, start_c)
+    total_distance = np.sum(diffs)
 
-if not phased: 
-    lda = calcNumFlips(lmbda, len(Hidden))
-else: 
-    lda = calcNumFlips_phased(lmbda, len(Hidden))#initial lda for all samples
+    if not phased: 
+        lda = calcNumFlips(lmbda, len(Hidden))
+    else: 
+        lda = calcNumFlips_phased(lmbda, len(Hidden))#initial lda for all samples
 
-
-# %%
-for sample in ["NA20342"]: #dicto.keys():
-    mdosages = []
-    #weightsc = []
-    print("Meta Imputing sample ...", sample, "in region", r)
-#subset data structures
-    og_transformed = gl[sample]
-
-#calculate posteriors
-    # #%timeit 
-    if EM:
-        lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
-
-    elif Nelder:  
-        evaluate(Hidden, og_transformed.size, list(og_transformed), emission_prob, transition_prob, sample_map(sample), ad, SNPs)
-
-    elif Vbi:
-        opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-        mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
-        
-        #print(mdosages)
-    elif phased: 
-        opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-        #print(opt_path[0:10])
-        phased_path = phasingPath(opt_path)
-        #print(phased_path[0:10])
-        mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad))   
-    else: #plain fwd-bwd as in paper 1
-    #use jumpfix forward backward function--scaling only required for baum welch.
-        pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-        mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
-#add to samples
-    samples[sample] = list(chain.from_iterable(mdosages))
-
-write_vcf(samples, SNPs, 'results/chunks/asw_phased_test_R2' + str(chunk_num), str.split(r, ":")[0], phased = phased)
+    for sample in dicto.keys():
+        mdosages = []
+        #weightsc = []
+        print("Meta Imputing sample ...", sample, "in region", r)
+    #subset data structures
+        og_transformed = gl[sample]
+    
+    #calculate posteriors
+        # #%timeit 
+        if EM:
+            lda_c = update_c(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, n_iter, total_distance, sample_map(sample), ad, lda, SNPs, start_c)
+    
+        elif Nelder:  
+            evaluate(Hidden, og_transformed.size, list(og_transformed), emission_prob, transition_prob, sample_map(sample), ad, SNPs)
+    
+        elif Vbi:
+            opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
+            
+            #print(mdosages)
+        elif phased: 
+            opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            #print(opt_path[0:10])
+            phased_path = phasingPath(opt_path)
+            #print(phased_path[0:10])
+            mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad, mask_r))   
+        else: #plain fwd-bwd as in paper 1
+        #use jumpfix forward backward function--scaling only required for baum welch.
+            pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
+            mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
+    #add to samples
+        samples[sample] = list(chain.from_iterable(mdosages))
+    
+    write_vcf(samples, SNPs, 'results/chunks/asw_phased_test_R2' + str(chunk_num), str.split(r, ":")[0], mask_r, phased = phased)
 
 #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()
 print("total time is", end - start)
 
+
+# %% [raw]
+# print(sum_not_missing)
+
+# %% [raw]
+# mask_r
+
+# %% [raw]
+# print(sum(mask_r.iloc[1,:]))
+# np.where(mask_r.iloc[0,:]==False)[0][0]

@@ -29,10 +29,10 @@ parser.add_argument("--chunk_size", required = False, dest = 'L')
 parser.add_argument("--recomb_rate", required = False, dest = 'c_start', type = float)
 parser.add_argument("--baum_welch", required = False, dest = 'bw', action = "store_true")
 parser.add_argument("--viterbi", required = False, dest = 'vbi', action = "store_true")
-parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true", help = "EXPERT USER ONLY: sets the dosages not polymorphic in both panels to be the same.")
+parser.add_argument("--samedosage", required = False, dest = 'same', action = "store_true", help = "Reccomended for aDNA targets: sets the dosages not polymorphic in both panels to be the same.")
 parser.add_argument("--zerodosage", required = False, dest = 'zero', action = "store_true", help = "sets the dosages not polymorphic in both panels to be zero. This is the version used in the manuscript.")
 parser.add_argument("--chr", required = True, dest = 'chr')
-parser.add_argument("--phased", required = False)
+parser.add_argument("--phased", required = False, dest = 'phased', action = 'store_true')
 parser.set_defaults(haploid=False)
 parser.set_defaults(nomixedstate=False)
 parser.set_defaults(pickle=False)
@@ -104,8 +104,8 @@ regions = get_region_list(*DS_list, chunk_size = L, CHR = args.chr)
 
 # %%
 for num, r in enumerate(regions):
-    SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = missing) 
-  
+    SNPs, dicto, gl, ad, mask = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = missing) 
+      #mask is a boolean that says which variants are missing from the panels
     assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
     assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
     assert len(dicto) == gl.shape[1] #check sample names are equivalent
@@ -130,12 +130,12 @@ for num, r in enumerate(regions):
         elif vbi:
             print("viterbi used")
             opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-            mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
+            mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad, mask))
        
         elif args.phased:  
             opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
             phased_path = phasingPath(opt_path)
-            mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad))  
+            mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad, mask))  
         
         else: #fwdbwd 
     #calculate posteriors
@@ -148,12 +148,12 @@ for num, r in enumerate(regions):
                 #mdosages.append(calcMetaDosages_nan(pst, sample_map(sample), ad))
                 raise ValueError("must specifiy either --zerodosage or --samedosage")
             else:
-                mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
+                mdosages.append(calcMetaDosages(pst, sample_map(sample), ad, mask))
                 #print("should not be here for viterbi")
     #add to samples
         samples[sample] = list(chain.from_iterable(mdosages))
 
-    write_vcf(samples, SNPs, args.out + str(num), args.chr, phased = args.phased)
+    write_vcf(samples, SNPs, args.out + str(num), args.chr, mask, phased = args.phased) #add option to include all variants here all_variants = args.allvar
 
 end = time.time ()
 print("total time is", end - start)

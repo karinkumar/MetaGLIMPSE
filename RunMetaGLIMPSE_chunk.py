@@ -70,8 +70,6 @@ K=len(DS_list)
 
 
 # %%
-
-# %%
 import pickle
 import pandas as pd
 from itertools import chain
@@ -108,7 +106,8 @@ chunk_num = idx
 
 
 start = time.time()
-SNPs, dicto, gl, ad = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = missing) 
+SNPs, dicto, gl, ad, mask = read_vcfs_genK_region(GL, *DS_list, region = r, outer = True, missing_handling = missing) 
+#mask is a boolean df that tells whether a variant i is missing from panel j
 assert ad.size/(K*2*len(dicto)) == len(gl) == len(SNPs) #check file size is consistent indicating markers are lined up
 assert len(np.unique(SNPs))==len(SNPs) #check SNPs are unique
 assert len(dicto) == gl.shape[1] #check sample names are equivalent
@@ -138,22 +137,22 @@ for sample in dicto.keys():
 
     elif vbi: 
         opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-        mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad))
+        mdosages.append(calcViterbiDosage(opt_path, sample_map(sample), ad, mask))
     elif args.phased: 
         opt_path = viterbi(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
         #print(opt_path[0:10])
         phased_path = phasingPath(opt_path)
         #print(phased_path[0:10])
-        mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad))   
+        mdosages.append(calcViterbiDosage(phased_path, sample_map(sample), ad, mask))   
     else: #plain fwd-bwd as in paper 1
     #use jumpfix forward backward function--scaling only required for baum welch.
         pst = fwd_bwd(Hidden, og_transformed.size, list(og_transformed), transition_prob, emission_prob, sample_map(sample), ad, lda)
-        mdosages.append(calcMetaDosages(pst, sample_map(sample), ad))
+        mdosages.append(calcMetaDosages(pst, sample_map(sample), ad, mask))
 #add to samples
     samples[sample] = list(chain.from_iterable(mdosages))
 
-print(args.out)
-write_vcf(samples, SNPs, args.out + str(chunk_num), args.chr, phased = args.phased)
+#print(args.out)
+write_vcf(samples, SNPs, args.out + str(chunk_num), args.chr, mask, phased = args.phased)
 
 #print("total time for", len(dicto.keys()), "samples is", time.time() - start)
 end = time.time ()

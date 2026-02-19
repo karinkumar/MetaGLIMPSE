@@ -18,7 +18,40 @@ import numpy as np
 
 
 # %%
-def calcMetaDosages(posteriors, sample, allelic_dosages):
+def calcMetaDosages(posteriors, sample, allelic_dosages, missing_mask):
+    '''INPUT: posteriors list of dictionaries, sample number 0 - N, allelic dosages numpy array
+       OUTPUT: list of meta genotype dosages one per marker 0 to M
+       
+       NOTES:multiply across haplotypes that have the SAME posterior weight 1,1 represents reference panel 1 allele 1  
+       AND reference panel 2 allele 2 (d_a*0.01 +  d_b*0.01)
+    '''
+    meta_dosages=list()
+    for m in range(len(posteriors)): 
+        missing_flag = missing_mask.iloc[m,:]
+        if sum(missing_flag)> 0: #if any variants are missing 
+            #which panel is it present in?
+            panel_idx = np.where(missing_flag == False)[0][0]
+            meta_dosages.append(allelic_dosages[panel_idx][0][sample][m] + allelic_dosages[panel_idx][1][sample][m])
+        else:
+            panels = posteriors[m]
+            #print(min(panels), max(panels))
+            meta_dosage=0
+            for key, value in panels.items():
+                a,b = key[0]
+                c,d = key[1]
+                meta_dosage += allelic_dosages[a-1][b-1][sample][m]*value + allelic_dosages[c-1][d-1][sample][m]*value
+            meta_dosages.append(meta_dosage)
+            meta_dosage=0 #reset weighted sum
+    #print(max(meta_dosages), min(meta_dosages))
+    if min(np.round(np.array(meta_dosages),3))>= 0 and max(np.round(np.array(meta_dosages),3)) <= 2: 
+        return(meta_dosages)
+    else: 
+        print(min(np.round(np.array(meta_dosages),3)), max(np.round(np.array(meta_dosages),3)) )
+        raise ValueError("Meta Dosages Not Between 0 and 2")
+
+
+# %%
+def calcMetaDosages_old(posteriors, sample, allelic_dosages):
     '''INPUT: posteriors list of dictionaries, sample number 0 - N, allelic dosages numpy array
        OUTPUT: list of meta genotype dosages one per marker 0 to M
        
@@ -45,13 +78,19 @@ def calcMetaDosages(posteriors, sample, allelic_dosages):
 
 
 # %%
-def calcViterbiDosage(opt_path, sample, allelic_dosages):
+def calcViterbiDosage(opt_path, sample, allelic_dosages, missing_mask):
     meta_dosages=list()
-    for m in range(len(opt_path)): 
-        allele_1, allele_2 = opt_path[m]
-        a,b = allele_1
-        c,d = allele_2
-        meta_dosages.append((allelic_dosages[a-1][b-1][sample][m],allelic_dosages[c-1][d-1][sample][m]))
+    for m in range(len(opt_path)):
+        missing_flag = missing_mask.iloc[m,:]
+        if sum(missing_flag)> 0: #if any variants are missing 
+            #which panel is it present in?
+            panel_idx = np.where(missing_flag == False)
+            meta_dosages.append(allelic_dosages[panel_idx][0][sample][m],allelic_dosage[panel_idx][1][sample][m])
+        else:
+            allele_1, allele_2 = opt_path[m]
+            a,b = allele_1
+            c,d = allele_2
+            meta_dosages.append((allelic_dosages[a-1][b-1][sample][m],allelic_dosages[c-1][d-1][sample][m]))
     #if min(np.round(np.array(meta_dosages),3))>= 0 and max(np.round(np.array(meta_dosages),3)) <= 2: 
     return(meta_dosages)
     #else: 
@@ -87,6 +126,8 @@ def phasingPath(opt_path):
                 phase_path.append((B,A))
                
             else: 
+                #print("previous",(C,D))
+                #print("next", (A,B))
                 raise ValueError("Cannot have num flips==2")
         previous = phase_path[m] #previous is now the correctly phased path
     return phase_path

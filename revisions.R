@@ -29,21 +29,26 @@ sum(t$`#Variants`)
 ### Reviewer 2 Question 2 ################
 true_r2 <- fread("ASW/240304isecASW_no1kgsingletondiploid0.1x_mixed_zerodosage.RSquare")
 est_r2 <- fread("/net/fantasia/home/kiranhk/HMM/est_r2_ASW_0.1x.txt")
-#read in INFO scores from Simone
 
+true_r2 <- fread("251118LOO_2x_UKBB.RSquare")
+est_r2 <- fread("/net/fantasia/home/kiranhk/HMM/est_r2_2x_EAS_UKBB.txt")
+setnames(est_r2, "V2", "estR2")
 
 setkey(true_r2, `#SNP.ID`)
 setkey(est_r2, V1)
 r2_comp <- true_r2[est_r2, nomatch =0]
-setnames(r2_comp, "V2", "estR2")
+#setnames(r2_comp, "V2", "estR2")
 r2_comp[, MAF:= ifelse(Allele.Frequency > 0.5, 1 - Allele.Frequency, Allele.Frequency)]
 #I might need to recompute the R2s afterwards because the Minor Allele flipped...maybe not because
 #both imputed and estimated R2 will have the allele flip, so the difference should be the same
-cor.test(r2_comp$Imputation.R2, r2_comp$estR2)
-cor(r2_comp$MAF, r2_comp$Imputation.R2)
-plot(r2_comp$MAF, r2_comp$estR2)
-plot(r2_comp$MAF, r2_comp$Imputation.R2)
+
+#plot(r2_comp$MAF, r2_comp$estR2)
+#plot(r2_comp$MAF, r2_comp$Imputation.R2)
 r2_comp[estR2 > 1, estR2:= 1] # set R2 greater than 1 to be 1
+
+cor.test(r2_comp$Imputation.R2, r2_comp$estR2, method = "spearman")
+cor.test(r2_comp$Imputation.R2, r2_comp$estR2)
+cor(r2_comp$MAF, r2_comp$Imputation.R2) #MAF correlation
 
 r2_comp[, diffr2 := Imputation.R2 - estR2]
 common <- r2_comp[MAF > 0.1]
@@ -67,39 +72,106 @@ ggplot(r2_comp, aes(x = log10(MAF), y = diffr2)) +
   ylab("True R2 - Estimated R2")
 
 mean(r2_comp$diffr2)
+sd(r2_comp$diffr2)
 
 
+######## Reviewer 1 Question 5######
 
-####################Reviewer 1 Question1############
-setwd("~/1kg30xASW/scripts")
-files <- list.files(pattern = "6*indv.switch")
-
-load_file <- function(cov, anc) {
-  file_name <- sprintf("%d_asw_switch_%s.diff.indv.switch", anc, cov)
-  if (file.exists(file_name)) {
-    df <- fread(file_name)
-    df[, cov := cov]
-    df[, panel := anc]
-    return(df)
-  } else {
-    print(file_name)
-    return(NULL)
-  }
+aggRSquare2Dt <- function(file_path, panel, target_ancestry, coverage) {
+  # Compose filename based on your convention
+  full_file <- paste0("~/aggRSquare/release-build/", file_path, coverage, "x_", panel, ".aggRSquare")
+  
+  # Read tab-delimited file, no header
+  dt <- fread(full_file, sep = "\t", header = FALSE)
+  dt <- dt[!grepl("^#", dt[[1]])]
+  
+  # Adjust columns as needed
+  setnames(dt, c("binned_MAF", "Avg_MAF", "N", "aggregated_R2", "gold_MAF", "imputed_MAF"))
+  
+  # Add metadata columns
+  dt[, Panel := panel]
+  dt[, TargetAncestry := target_ancestry]
+  dt[, Coverage := coverage]
+  return(dt)
 }
-prefix = ""
-fs <- list()
-for (p in prefix) {
-  for (cov in 6) {
-    # AMR
-    dfs[[paste0(cov, p)]] <- load_file(p, chr, "1KG_AMR")
-    # AFR
-    dfs[[paste0(cov, p)]] <- load_file(p, chr, "1KG_AFR")
-    # EUR
-    dfs[[paste0("EUR_chr", chr, p)]] <- load_file(p, chr, "1KG_EUR")
-  }
-}
-# Remove NULL entries (files that weren't loaded)
-dfs <- dfs[!sapply(dfs, is.null)]
 
-# Combine all data
-all <- rbindlist(dfs, fill = TRUE)
+cov = c("0.1", "0.5", "1", "2", "4", "6", "8")
+
+# Define all your configs with multiple coverages per ancestry/panel
+panel_configs <- list(
+  list(
+    file_path = "250901isec10aDNA_no1kgsingletondiploid", 
+    target_ancestry = "aDNA Targets", 
+    panels = c("AFR_EUR", "AFR", "EUR", "mixed_fb_zerodosage", "mixed_phased_zerodosage", "plain_fb_zerodosage"), 
+    coverages = cov
+  ),
+  list(
+    file_path = "ASW/240304isecASW_no1kgsingletondiploid", 
+    target_ancestry = "African-American Targets", 
+    panels = c("mixed_zerodosage", "plain_zerodosage", "AFR", "EUR", "AFR_EUR" "mixed_zerodosagephased"), 
+    coverages = cov
+  ),
+  list(
+    file_path = "240308isec2panelEASdiploid_no1kgsingleton_", 
+    target_ancestry = "East Asian Targets", 
+    panels = c("AFR_EUR", "mixed", "AFR", "EUR"), 
+    coverages = cov
+  ),
+  list(
+    file_path = "EUR/240703LOO_", 
+    target_ancestry = "European Targets", 
+    panels = c("EURmega", "EURA", "mixedzerodosage", "EURB", "plainzerodosage"), 
+    coverages = cov
+  ),
+  list(
+    file_path = "251118LOO_", 
+    target_ancestry = "East Asian Targets", 
+    panels = c("EAS", "UKBB", "mixed"), 
+    coverages = "2"
+  )
+)
+
+# Expand all configurations into a data.table of jobs to run
+all_configs <- rbindlist(
+  lapply(panel_configs, function(cfg) {
+    # For every combination of panel and coverage
+    expand.grid(
+      file_path = cfg$file_path,
+      panel = cfg$panels,
+      target_ancestry = cfg$target_ancestry,
+      coverage = cfg$coverages,
+      stringsAsFactors = FALSE
+    )
+  }), fill = TRUE
+)
+
+# Read all files, storing results
+results_list <- lapply(1:nrow(all_configs), function(i) {
+  cfg <- all_configs[i]
+  # Try to read the file, if fails return NULL
+  tryCatch({
+    aggRSquare2Dt(cfg$file_path, cfg$panel, cfg$target_ancestry, cfg$coverage)
+  }, error = function(e) {
+    message(sprintf("Could not read file for %s %s %s %s", 
+                    cfg$file_path, cfg$panel, cfg$target_ancestry, cfg$coverage))
+    NULL
+  })
+})
+
+# Combine all successful reads
+full_data_table <- rbindlist(
+  results_list[!sapply(results_list, is.null)], 
+  use.names = TRUE, fill = TRUE
+)
+
+full_data_table[, gold_MAF:= NULL]
+full_data_table[, imputed_MAF := NULL]
+full_data_table[Panel %in% c("mixed", "mixed_zerodosage", "mixed_fb_zerodosage", "mixedzerodosage"), Panel := "MetaGLIMPSE"]
+full_data_table[Panel %in% c("plain", "plain_zerodosage", "plain_fb_zerodosage", "plainzerodosage"), Panel := "MetaGLIMPSE-plain"]
+full_data_table[Panel %in% c("mixed_phased_zerodosage", "mixed_zerodosagephased"), Panel := "MetaGLIMPSE-phased"]
+# Save to CSV
+
+full_data_table
+fwrite(full_data_table, "~/aggRSquare/release-build/ImputationResults_Aggregated.csv")
+
+cat("Aggregated imputation results table written to ~/aggRSquare/ImputationResults_Aggregated.csv\n")
