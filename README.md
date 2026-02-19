@@ -34,6 +34,7 @@ See the example folder for African American input files derived from 1000 Genome
 python3.11 RunMetaGLIMPSE.py --dosages example/ASWbcftoolsEURdiploid_1xchr20.vcf.gz example/ASWbcftoolsAFRdiploid_1xchr20.vcf.gz --gl example/bcftoolsgenogvcfs1x.vcf.gz --zerodosage --out ASWchr20 --chr 'chr20'
 ```
 
+For ancient DNA or unequal reference panel size (i.e. 1000 Genomes + UKBiobank), we reccomend using --samedosage instead of --zerodosage.
 
 ***3 Ligate*** 
 
@@ -67,10 +68,10 @@ You can run a particular chunk as follows:
     REGE=$(echo ${{IRG}} | cut -d":" -f 2 | cut -d"-" -f2)
 
     # Execute GLIMPSE2_phase for the current chunk
-    ./phase/bin/GLIMPSE2_phase --input-gl YOUR_GL_FILE.vcf.gz --reference YOUR_REF_PANEL.bin --output YOUR_OUTPUT_NAME_${{CHR}}_${{REGS}}_${\{REGE}}.bcf --out-ap-field --main 1 --burnin 19 --keep-monomorphic
+    ./phase/bin/GLIMPSE2_phase --input-gl YOUR_GL_FILE.vcf.gz --reference YOUR_REF_PANEL.bin --output YOUR_OUTPUT_NAME_${{CHR}}_${{REGS}}_${\{REGE}}.bcf --out-ap-field --main 1 --burnin 19 
 
 
-These last four options are *essential* in obtaining the correct results in both this branch of GLIMPSE2 and in MetaGLIMPSE. Once you've run GLIMPSE2. Simply plug the imputed dosages and genotype likelihoods into MetaGLIMPSE as in Step 2. And then ligate the chunks as in Step 3. 
+These last three options are *essential* in obtaining the correct results in both this branch of GLIMPSE2 and in MetaGLIMPSE. Once you've run GLIMPSE2. Simply plug the imputed dosages and genotype likelihoods into MetaGLIMPSE as in Step 2. And then ligate the chunks as in Step 3. 
 
 
 **5 Run MetaGLIMPSE in parallel by chunk**
@@ -84,6 +85,7 @@ Second, run MetaGLIMPSE_chunk.py (This runs MetaGLIMPSE in a single chunk--you w
 ```
 python3.11 RunMetaGLIMPSE_chunk.py  --dosages YOUR_GLIMPSE2_result_refpanel1.vcf.gz YOUR_GLIMPSE2_result_refpanel2.vcf.gz --gl YOUR_GL_FILE.vcf.gz  --out YOUR_OUTNAME_PREFIX --zerodosage --region REGION_NUMBER --chunks 'YOUR_CHUNK_FILE.txt --chr 'chr20'
 ```
+Note: we have only done extensive testing on variants that are present in both reference panels. Those that are not missing in a particular reference panel are copied from the that single-panel imputation. However, we have not tested the copying extensively, so please double check to make sure it looks right if you are using these variants from the MetaGLIMPSE output
 
 ****Frequently Asked Questions (FAQ)****
 
