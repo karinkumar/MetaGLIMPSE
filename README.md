@@ -53,8 +53,6 @@ Now you are ready to run GLIMPSE2 with each of your reference panels. Please dow
 
 NOTE: if you have aDNA targets or meta-imputing with panels of unequal sizes (e.g. 1000G and UKBB), we reccomend using --samedosage instead of --zerodosage. In our experiments, we have found improved performance of MetaGLIMPSE.
 
-*At the moment, we are fixing an issue with this branch, if you want to run MetaGLIMPSE and get access to AP option code, please contact me either by email or on github*
-
 You can run a particular chunk as follows: 
 
     LINE=$(sed -n "${{NUM}}p" YOUR_CHUNK_FILE.txt)
