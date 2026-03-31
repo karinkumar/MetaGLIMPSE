@@ -6,7 +6,7 @@ This method takes the results from two or more single panel GLIMPSE2 imputations
 
 The output of this method is a vcf file at the union set of markers in each input file with the estimated genotype dosage for each sample and marker.
 
-See pre-print for more information: https://www.biorxiv.org/content/10.1101/2025.06.24.660721v2
+Now published in AJHG: https://doi.org/10.1016/j.ajhg.2026.02.004
 
 ***1. Installation***
 
